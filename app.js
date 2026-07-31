@@ -56,13 +56,13 @@ function renderExerciseList() {
     return;
   }
 
-  selectedExercises.forEach((name, index) => {
+  selectedExercises.forEach((item, index) => {
     const li = document.createElement("li");
     li.className = "exercise-list-item";
 
     const left = document.createElement("span");
     left.className = "name";
-    left.innerHTML = `<span class="index">${index + 1}.</span>${name}`;
+    left.innerHTML = `<span class="index">${index + 1}.</span>${item.name}`;
 
     const removeBtn = document.createElement("button");
     removeBtn.type = "button";
@@ -82,12 +82,17 @@ function addExercise() {
   const name = exerciseSelect.value;
   if (!name) return;
 
-  if (selectedExercises.includes(name)) {
+  if (selectedExercises.some((item) => item.name === name)) {
     exerciseSelect.value = "";
     return;
   }
 
-  selectedExercises.push(name);
+  const initialSets = Array.from({ length: SETS_PER_EXERCISE }, () => ({
+    weight: "",
+    reps: "",
+  }));
+
+  selectedExercises.push({ name, sets: initialSets });
   exerciseSelect.value = "";
   renderExerciseList();
 }
@@ -95,6 +100,19 @@ function addExercise() {
 function removeExercise(index) {
   selectedExercises.splice(index, 1);
   renderExerciseList();
+}
+
+function addSet(exerciseIndex) {
+  selectedExercises[exerciseIndex].sets.push({ weight: "", reps: "" });
+  renderSetsForm();
+}
+
+function removeSet(exerciseIndex) {
+  const exercise = selectedExercises[exerciseIndex];
+  if (exercise.sets.length > 1) {
+    exercise.sets.pop();
+    renderSetsForm();
+  }
 }
 
 function showPhase(phase) {
@@ -117,21 +135,56 @@ function showPhase(phase) {
 function renderSetsForm() {
   setsContainer.innerHTML = "";
 
-  selectedExercises.forEach((name, exerciseIndex) => {
+  selectedExercises.forEach((item, exerciseIndex) => {
     const block = document.createElement("div");
     block.className = "exercise-block";
     block.dataset.exerciseIndex = exerciseIndex;
 
-    const title = document.createElement("h3");
-    title.textContent = name;
-    block.appendChild(title);
-
     const header = document.createElement("div");
-    header.className = "sets-header";
-    header.innerHTML = "<span>Set</span><span>Weight (lbs)</span><span>Reps</span>";
+    header.className = "exercise-header";
+
+    const title = document.createElement("h3");
+    title.textContent = item.name;
+
+    const setControls = document.createElement("div");
+    setControls.className = "set-controls";
+
+    const minusBtn = document.createElement("button");
+    minusBtn.type = "button";
+    minusBtn.className = "btn-set-control";
+    minusBtn.textContent = "−";
+    minusBtn.setAttribute("aria-label", `Decrease sets for ${item.name}`);
+    if (item.sets.length <= 1) {
+      minusBtn.disabled = true;
+    }
+    minusBtn.addEventListener("click", () => removeSet(exerciseIndex));
+
+    const setBadge = document.createElement("span");
+    setBadge.className = "set-count-badge";
+    setBadge.textContent = `${item.sets.length} set${item.sets.length !== 1 ? "s" : ""}`;
+
+    const plusBtn = document.createElement("button");
+    plusBtn.type = "button";
+    plusBtn.className = "btn-set-control";
+    plusBtn.textContent = "+";
+    plusBtn.setAttribute("aria-label", `Increase sets for ${item.name}`);
+    plusBtn.addEventListener("click", () => addSet(exerciseIndex));
+
+    setControls.appendChild(minusBtn);
+    setControls.appendChild(setBadge);
+    setControls.appendChild(plusBtn);
+
+    header.appendChild(title);
+    header.appendChild(setControls);
     block.appendChild(header);
 
-    for (let setNum = 1; setNum <= SETS_PER_EXERCISE; setNum++) {
+    const tableHeader = document.createElement("div");
+    tableHeader.className = "sets-header";
+    tableHeader.innerHTML = "<span>Set</span><span>Weight (lbs)</span><span>Reps</span>";
+    block.appendChild(tableHeader);
+
+    item.sets.forEach((setData, setIdx) => {
+      const setNum = setIdx + 1;
       const row = document.createElement("div");
       row.className = "set-row";
 
@@ -145,10 +198,11 @@ function renderSetsForm() {
       weightInput.placeholder = "0";
       weightInput.min = "0";
       weightInput.step = "2.5";
-      weightInput.dataset.field = "weight";
-      weightInput.dataset.exercise = exerciseIndex;
-      weightInput.dataset.set = setNum - 1;
+      weightInput.value = setData.weight;
       weightInput.inputMode = "decimal";
+      weightInput.addEventListener("input", (e) => {
+        setData.weight = e.target.value;
+      });
 
       const repsInput = document.createElement("input");
       repsInput.type = "number";
@@ -156,41 +210,31 @@ function renderSetsForm() {
       repsInput.placeholder = "0";
       repsInput.min = "0";
       repsInput.step = "1";
-      repsInput.dataset.field = "reps";
-      repsInput.dataset.exercise = exerciseIndex;
-      repsInput.dataset.set = setNum - 1;
+      repsInput.value = setData.reps;
       repsInput.inputMode = "numeric";
+      repsInput.addEventListener("input", (e) => {
+        setData.reps = e.target.value;
+      });
 
       row.appendChild(setLabel);
       row.appendChild(weightInput);
       row.appendChild(repsInput);
       block.appendChild(row);
-    }
+    });
 
     setsContainer.appendChild(block);
   });
 }
 
 function collectWorkoutData() {
-  return selectedExercises.map((name, exerciseIndex) => {
-    const sets = [];
+  return selectedExercises.map((item) => {
+    const sets = item.sets.map((s, idx) => ({
+      set: idx + 1,
+      weight: s.weight !== "" && s.weight !== null ? Number(s.weight) : null,
+      reps: s.reps !== "" && s.reps !== null ? Number(s.reps) : null,
+    }));
 
-    for (let setNum = 0; setNum < SETS_PER_EXERCISE; setNum++) {
-      const weightEl = document.querySelector(
-        `[data-field="weight"][data-exercise="${exerciseIndex}"][data-set="${setNum}"]`
-      );
-      const repsEl = document.querySelector(
-        `[data-field="reps"][data-exercise="${exerciseIndex}"][data-set="${setNum}"]`
-      );
-
-      sets.push({
-        set: setNum + 1,
-        weight: weightEl.value !== "" ? Number(weightEl.value) : null,
-        reps: repsEl.value !== "" ? Number(repsEl.value) : null,
-      });
-    }
-
-    return { name, sets };
+    return { name: item.name, sets };
   });
 }
 
