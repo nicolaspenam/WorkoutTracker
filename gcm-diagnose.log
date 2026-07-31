@@ -1,0 +1,201 @@
+﻿Diagnose log at 2026-07-31T03:42:52Z
+
+AppPath: C:\Program Files\Git\mingw64\bin\git-credential-manager.exe
+InstallDir: C:\Program Files\Git\mingw64\bin\
+Version: 2.9.0+194ba290ce533465310d50f811684ab180536ae7
+
+------------
+Diagnostic: Environment
+Skipped: False
+Success: True
+Exception: None
+Log:
+OSType: Windows
+OSVersion: 10.0 (build 19045)
+Reading environment variables... OK
+ Variables:
+OneDriveConsumer=C:\Users\NicolasP\OneDrive
+ProgramFiles(x86)=C:\Program Files (x86)
+MSYSTEM=MINGW64
+ProgramW6432=C:\Program Files
+EXEPATH=C:\Program Files\Git
+PROCESSOR_IDENTIFIER=Intel64 Family 6 Model 94 Stepping 3, GenuineIntel
+PKG_CONFIG_SYSTEM_LIBRARY_PATH=C:/Program Files/Git/mingw64/lib
+APPDATA=C:\Users\NicolasP\AppData\Roaming
+TMP=C:\Users\NicolasP\AppData\Local\Temp
+PROCESSOR_ARCHITECTURE=AMD64
+INFOPATH=C:\Program Files\Git\mingw64\local\info;C:\Program Files\Git\mingw64\share\info;C:\Program Files\Git\usr\local\info;C:\Program Files\Git\usr\share\info;C:\Program Files\Git\usr\info;C:\Program Files\Git\share\info
+PATHEXT=.COM;.EXE;.BAT;.CMD;.VBS;.VBE;.JS;.JSE;.WSF;.WSH;.MSC
+MSYSTEM_CARCH=x86_64
+configsetroot=C:\WINDOWS\ConfigSetRoot
+CONFIG_SITE=C:/Program Files/Git/etc/config.site
+PROCESSOR_REVISION=5e03
+OLDPWD=C:/Users/NicolasP/WorkoutTracker
+TEMP=C:\Users\NicolasP\AppData\Local\Temp
+USERPROFILE=C:\Users\NicolasP
+PKG_CONFIG_PATH=C:\Program Files\Git\mingw64\lib\pkgconfig;C:\Program Files\Git\mingw64\share\pkgconfig
+LOGONSERVER=\\LAPTOP-8GSP2JPA
+TERM=xterm-256color
+USERNAME=NicolasP
+ProgramData=C:\ProgramData
+GIT_EXEC_PATH=C:/Program Files/Git/mingw64/libexec/git-core
+PLINK_PROTOCOL=ssh
+COMMONPROGRAMFILES=C:\Program Files\Common Files
+_=C:/Program Files/Git/mingw64/bin/git
+PATH=C:/Program Files/Git/mingw64/libexec/git-core;C:\Users\NicolasP\bin;C:\Program Files\Git\mingw64\bin;C:\Program Files\Git\usr\local\bin;C:\Program Files\Git\usr\bin;C:\Program Files\Git\usr\bin;C:\Program Files\Git\mingw64\bin;C:\Program Files\Git\usr\bin;C:\Users\NicolasP\bin;C:\Program Files (x86)\Intel\iCLS Client;C:\Program Files\Intel\iCLS Client;C:\Windows\system32;C:\Windows;C:\Windows\System32\Wbem;C:\Windows\System32\WindowsPowerShell\v1.0;C:\Program Files (x86)\Intel\Intel(R) Management Engine Components\DAL;C:\Program Files\Intel\Intel(R) Management Engine Components\DAL;C:\Program Files (x86)\Intel\Intel(R) Management Engine Components\IPT;C:\Program Files\Intel\Intel(R) Management Engine Components\IPT;C:\Program Files (x86)\NVIDIA Corporation\PhysX\Common;C:\Program Files\Intel\WiFi\bin;C:\Program Files\Common Files\Intel\WirelessCommon;%SystemRoot%\system32;%SystemRoot%;%SystemRoot%\System32\Wbem;%SYSTEMROOT%\System32\WindowsPowerShell\v1.0;%SYSTEMROOT%\System32\OpenSSH;C:\Users\NicolasP\AppData\Local\Microsoft\WindowsApps;C:\Program Files\Git\usr\bin\vendor_perl;C:\Program Files\Git\usr\bin\core_perl
+OneDrive=C:\Users\NicolasP\OneDrive
+LOCALAPPDATA=C:\Users\NicolasP\AppData\Local
+PKG_CONFIG_SYSTEM_INCLUDE_PATH=C:/Program Files/Git/mingw64/include
+CommonProgramFiles(x86)=C:\Program Files (x86)\Common Files
+PROCESSOR_LEVEL=6
+MINGW_CHOST=x86_64-w64-mingw32
+HOSTNAME=LAPTOP-8GSP2JPA
+HOMEPATH=\Users\NicolasP
+DISPLAY=needs-to-be-defined
+MANPATH=C:\Program Files\Git\mingw64\local\man;C:\Program Files\Git\mingw64\share\man;C:\Program Files\Git\usr\local\man;C:\Program Files\Git\usr\share\man;C:\Program Files\Git\usr\man;C:\Program Files\Git\share\man
+WINDIR=C:\WINDOWS
+USERDOMAIN=LAPTOP-8GSP2JPA
+ORIGINAL_TMP=C:/Users/NicolasP/AppData/Local/Temp
+ALLUSERSPROFILE=C:\ProgramData
+CommonProgramW6432=C:\Program Files\Common Files
+SYSTEMROOT=C:\WINDOWS
+PWD=C:/Users/NicolasP/WorkoutTracker/WorkoutTracker
+NUMBER_OF_PROCESSORS=8
+SHELL=C:\Program Files\Git\usr\bin\bash.exe
+PROGRAMFILES=C:\Program Files
+SHLVL=1
+SESSIONNAME=Console
+DriverData=C:\Windows\System32\Drivers\DriverData
+HOMEDRIVE=C:
+GIT_TRACE2_PARENT_SID=0820cd2f-70a7-419b-845d-15b5c4273160
+ACLOCAL_PATH=C:\Program Files\Git\mingw64\share\aclocal;C:\Program Files\Git\usr\share\aclocal
+ORIGINAL_PATH=C:\Program Files\Git\mingw64\bin;C:\Program Files\Git\usr\bin;C:\Users\NicolasP\bin;C:\Program Files (x86)\Intel\iCLS Client;C:\Program Files\Intel\iCLS Client;C:\Windows\system32;C:\Windows;C:\Windows\System32\Wbem;C:\Windows\System32\WindowsPowerShell\v1.0;C:\Program Files (x86)\Intel\Intel(R) Management Engine Components\DAL;C:\Program Files\Intel\Intel(R) Management Engine Components\DAL;C:\Program Files (x86)\Intel\Intel(R) Management Engine Components\IPT;C:\Program Files\Intel\Intel(R) Management Engine Components\IPT;C:\Program Files (x86)\NVIDIA Corporation\PhysX\Common;C:\Program Files\Intel\WiFi\bin;C:\Program Files\Common Files\Intel\WirelessCommon;%SystemRoot%\system32;%SystemRoot%;%SystemRoot%\System32\Wbem;%SYSTEMROOT%\System32\WindowsPowerShell\v1.0;%SYSTEMROOT%\System32\OpenSSH;C:\Users\NicolasP\AppData\Local\Microsoft\WindowsApps
+OS=Windows_NT
+MSYSTEM_PREFIX=C:/Program Files/Git/mingw64
+__COMPAT_LAYER=DetectorsAppHealth
+MSYSTEM_CHOST=x86_64-w64-mingw32
+MINGW_PREFIX=C:/Program Files/Git/mingw64
+ORIGINAL_TEMP=C:/Users/NicolasP/AppData/Local/Temp
+HOME=C:\Users\NicolasP
+SYSTEMDRIVE=C:
+PSModulePath=C:\Program Files\WindowsPowerShell\Modules;C:\WINDOWS\system32\WindowsPowerShell\v1.0\Modules
+TMPDIR=C:\Users\NicolasP\AppData\Local\Temp
+MINGW_PACKAGE_PREFIX=mingw-w64-x86_64
+PS1=\[\033]0;$TITLEPREFIX:$PWD\007\]\n\[\033[32m\]\u@\h \[\033[35m\]$MSYSTEM \[\033[33m\]\w\[\033[36m\]`__git_ps1`\[\033[0m\]\n$ 
+COMPUTERNAME=LAPTOP-8GSP2JPA
+LC_CTYPE=en_US.UTF-8
+SSH_ASKPASS=C:/Program Files/Git/mingw64/bin/git-askpass.exe
+COMSPEC=C:\WINDOWS\system32\cmd.exe
+TERM_PROGRAM_VERSION=3.8.3
+USERDOMAIN_ROAMINGPROFILE=LAPTOP-8GSP2JPA
+PUBLIC=C:\Users\Public
+TERM_PROGRAM=mintty
+
+
+------------
+Diagnostic: File system
+Skipped: False
+Success: True
+Exception: None
+Log:
+Temporary directory is 'C:\Users\NicolasP\AppData\Local\Temp\'...
+Checking basic file I/O...
+Writing to temporary file 'C:\Users\NicolasP\AppData\Local\Temp\c5244e5fa44dfd42af0ffdf3'... OK
+Reading from temporary file 'C:\Users\NicolasP\AppData\Local\Temp\c5244e5fa44dfd42af0ffdf3'... OK
+Deleting temporary file 'C:\Users\NicolasP\AppData\Local\Temp\c5244e5fa44dfd42af0ffdf3'... OK
+Testing IFileSystem instance...
+UserHomePath: C:\Users\NicolasP
+UserDataDirectoryPath: C:\Users\NicolasP\.gcm
+GetCurrentDirectory(): C:\Users\NicolasP\WorkoutTracker\WorkoutTracker
+
+------------
+Diagnostic: Networking
+Skipped: False
+Success: True
+Exception: None
+Log:
+Checking networking and HTTP stack...
+Creating HTTP client... OK
+IsNetworkAvailable: True
+Sending HEAD request to http://example.com... OK
+Sending HEAD request to https://example.com... OK
+Acquiring free TCP port... OK
+Testing local HTTP loopback connections...
+Creating new HTTP listener for http://localhost:52719/... OK
+Waiting for loopback connection... OK
+Writing response... OK
+Waiting for response data... OK
+Loopback connection data OK
+
+------------
+Diagnostic: Git
+Skipped: False
+Success: True
+Exception: None
+Log:
+Getting Git version... OK
+Git version is '2.55.0.windows.3'
+Locating current repository...Git repository at 'C:/Users/NicolasP/WorkoutTracker/WorkoutTracker/.git'
+ OK
+Listing all Git configuration... OK
+Git configuration:
+file:C:/Program Files/Git/etc/gitconfig	diff.astextplain.textconv=astextplain
+file:C:/Program Files/Git/etc/gitconfig	filter.lfs.clean=git-lfs clean -- %f
+file:C:/Program Files/Git/etc/gitconfig	filter.lfs.smudge=git-lfs smudge -- %f
+file:C:/Program Files/Git/etc/gitconfig	filter.lfs.process=git-lfs filter-process
+file:C:/Program Files/Git/etc/gitconfig	filter.lfs.required=true
+file:C:/Program Files/Git/etc/gitconfig	http.sslbackend=schannel
+file:C:/Program Files/Git/etc/gitconfig	core.autocrlf=true
+file:C:/Program Files/Git/etc/gitconfig	core.fscache=true
+file:C:/Program Files/Git/etc/gitconfig	core.symlinks=false
+file:C:/Program Files/Git/etc/gitconfig	core.editor="C:\\Program Files\\Sublime Text 3\\subl.exe" -w
+file:C:/Program Files/Git/etc/gitconfig	pull.rebase=false
+file:C:/Program Files/Git/etc/gitconfig	credential.helper=manager
+file:C:/Program Files/Git/etc/gitconfig	credential.https://dev.azure.com.usehttppath=true
+file:C:/Program Files/Git/etc/gitconfig	init.defaultbranch=main
+file:.git/config	core.repositoryformatversion=0
+file:.git/config	core.filemode=false
+file:.git/config	core.bare=false
+file:.git/config	core.logallrefupdates=true
+file:.git/config	core.symlinks=false
+file:.git/config	core.ignorecase=true
+file:.git/config	remote.origin.url=https://github.com/nicolaspenam/WorkoutTracker
+file:.git/config	remote.origin.fetch=+refs/heads/*:refs/remotes/origin/*
+file:.git/config	branch.main.remote=origin
+file:.git/config	branch.main.merge=refs/heads/main
+
+
+------------
+Diagnostic: Credential storage
+Skipped: False
+Success: True
+Exception: None
+Log:
+ICredentialStore instance is of type: CredentialStore
+Writing test credential... OK
+Reading test credential... OK
+Deleting test credential... OK
+
+------------
+Diagnostic: Microsoft authentication (AAD/MSA)
+Skipped: False
+Success: True
+Exception: None
+Log:
+Broker is not enabled.
+Gathering MSAL token cache data... OK
+CacheDirectory: C:\Users\NicolasP\AppData\Local\.IdentityService
+CacheFileName: msal.cache
+CacheFilePath: C:\Users\NicolasP\AppData\Local\.IdentityService\msal.cache
+Creating cache helper... OK
+Verifying MSAL token cache persistence... OK
+
+------------
+Diagnostic: GitHub API
+Skipped: False
+Success: True
+Exception: None
+Log:
+Using 'https://github.com/' as API target.
+Querying '/meta' endpoint... OK
+
