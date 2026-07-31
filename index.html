@@ -39,6 +39,15 @@
 
     <!-- Phase 2: Track sets -->
     <section id="track-phase" class="phase hidden">
+      <div id="rest-timer-bar" class="rest-timer-bar hidden">
+        <div class="timer-info">
+          <span class="timer-icon" aria-hidden="true">⏱</span>
+          <span class="timer-title">Rest Timer</span>
+        </div>
+        <div class="timer-countdown" id="timer-display">1:30</div>
+        <button type="button" id="dismiss-timer-btn" class="btn-timer-dismiss" aria-label="Dismiss timer">✕</button>
+      </div>
+
       <div id="sets-container"></div>
 
       <button type="button" id="finish-workout-btn" class="btn btn-primary btn-full">

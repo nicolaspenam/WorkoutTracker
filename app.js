@@ -18,6 +18,8 @@ const EXERCISES = [
 
 const SETS_PER_EXERCISE = 3;
 
+const DEFAULT_REST_SECONDS = 90;
+
 const buildPhase = document.getElementById("build-phase");
 const trackPhase = document.getElementById("track-phase");
 const summaryPhase = document.getElementById("summary-phase");
@@ -33,7 +35,52 @@ const summaryMeta = document.getElementById("summary-meta");
 const summaryDetails = document.getElementById("summary-details");
 const newWorkoutBtn = document.getElementById("new-workout-btn");
 
+const restTimerBar = document.getElementById("rest-timer-bar");
+const timerDisplay = document.getElementById("timer-display");
+const dismissTimerBtn = document.getElementById("dismiss-timer-btn");
+
 let selectedExercises = [];
+let timerInterval = null;
+let timerSecondsLeft = 0;
+
+function formatTime(seconds) {
+  const mins = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  return `${mins}:${secs < 10 ? "0" : ""}${secs}`;
+}
+
+function startRestTimer(duration = DEFAULT_REST_SECONDS) {
+  if (timerInterval) {
+    clearInterval(timerInterval);
+  }
+
+  timerSecondsLeft = duration;
+  timerDisplay.textContent = formatTime(timerSecondsLeft);
+  restTimerBar.classList.remove("hidden");
+  restTimerBar.classList.remove("finished");
+
+  timerInterval = setInterval(() => {
+    timerSecondsLeft--;
+
+    if (timerSecondsLeft <= 0) {
+      clearInterval(timerInterval);
+      timerInterval = null;
+      timerSecondsLeft = 0;
+      timerDisplay.textContent = "0:00";
+      restTimerBar.classList.add("finished");
+    } else {
+      timerDisplay.textContent = formatTime(timerSecondsLeft);
+    }
+  }, 1000);
+}
+
+function stopRestTimer() {
+  if (timerInterval) {
+    clearInterval(timerInterval);
+    timerInterval = null;
+  }
+  restTimerBar.classList.add("hidden");
+}
 
 function populateDropdown() {
   EXERCISES.forEach((name) => {
@@ -90,6 +137,7 @@ function addExercise() {
   const initialSets = Array.from({ length: SETS_PER_EXERCISE }, () => ({
     weight: "",
     reps: "",
+    completed: false,
   }));
 
   selectedExercises.push({ name, sets: initialSets });
@@ -103,7 +151,7 @@ function removeExercise(index) {
 }
 
 function addSet(exerciseIndex) {
-  selectedExercises[exerciseIndex].sets.push({ weight: "", reps: "" });
+  selectedExercises[exerciseIndex].sets.push({ weight: "", reps: "", completed: false });
   renderSetsForm();
 }
 
@@ -112,6 +160,17 @@ function removeSet(exerciseIndex) {
   if (exercise.sets.length > 1) {
     exercise.sets.pop();
     renderSetsForm();
+  }
+}
+
+function handleSetInput(setData) {
+  const isFilled = setData.weight !== "" && setData.reps !== "";
+
+  if (isFilled && !setData.completed) {
+    setData.completed = true;
+    startRestTimer(DEFAULT_REST_SECONDS);
+  } else if (!isFilled && setData.completed) {
+    setData.completed = false;
   }
 }
 
@@ -202,6 +261,7 @@ function renderSetsForm() {
       weightInput.inputMode = "decimal";
       weightInput.addEventListener("input", (e) => {
         setData.weight = e.target.value;
+        handleSetInput(setData);
       });
 
       const repsInput = document.createElement("input");
@@ -214,6 +274,7 @@ function renderSetsForm() {
       repsInput.inputMode = "numeric";
       repsInput.addEventListener("input", (e) => {
         setData.reps = e.target.value;
+        handleSetInput(setData);
       });
 
       row.appendChild(setLabel);
@@ -279,6 +340,7 @@ function startWorkout() {
 }
 
 function finishWorkout() {
+  stopRestTimer();
   const data = collectWorkoutData();
   renderSummary(data);
   showPhase("summary");
@@ -286,6 +348,7 @@ function finishWorkout() {
 }
 
 function resetWorkout() {
+  stopRestTimer();
   selectedExercises = [];
   renderExerciseList();
   showPhase("build");
@@ -299,6 +362,7 @@ exerciseSelect.addEventListener("keydown", (e) => {
 startWorkoutBtn.addEventListener("click", startWorkout);
 finishWorkoutBtn.addEventListener("click", finishWorkout);
 newWorkoutBtn.addEventListener("click", resetWorkout);
+dismissTimerBtn.addEventListener("click", stopRestTimer);
 
 populateDropdown();
 renderExerciseList();
