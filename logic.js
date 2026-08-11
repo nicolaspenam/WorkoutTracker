@@ -30,7 +30,8 @@ export function handleSetCompletion(setData) {
 
   if (isFilled && !setData.completed) {
     setData.completed = true;
-    return true; // newly completed → caller should start rest timer
+    // newly completed → caller should start rest timer
+    return true;
   } else if (!isFilled && setData.completed) {
     setData.completed = false;
   }
