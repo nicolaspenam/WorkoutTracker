@@ -15,7 +15,7 @@ import {
   hasPreviousSet,
   applyPreviousSet,
   updateSetField,
-  setInputSource,
+  fieldInputSource,
   addSet as addSetToExercise,
   removeSet as removeSetFromExercise,
   workoutToExercises,
@@ -318,8 +318,8 @@ function useSavedWorkout(workout) {
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
-function inputClassFor(setData) {
-  const source = setInputSource(setData);
+function inputClassFor(setData, field) {
+  const source = fieldInputSource(setData, field);
   if (source === "previous") return "input from-previous";
   if (source === "typed") return "input from-typed";
   return "input";
@@ -410,7 +410,7 @@ function renderSetsForm() {
 
       const weightInput = document.createElement("input");
       weightInput.type = "number";
-      weightInput.className = inputClassFor(setData);
+      weightInput.className = inputClassFor(setData, "weight");
       weightInput.placeholder = "lbs";
       weightInput.min = "0";
       weightInput.step = "2.5";
@@ -420,7 +420,7 @@ function renderSetsForm() {
 
       const repsInput = document.createElement("input");
       repsInput.type = "number";
-      repsInput.className = inputClassFor(setData);
+      repsInput.className = inputClassFor(setData, "reps");
       repsInput.placeholder = "reps";
       repsInput.min = "0";
       repsInput.step = "1";
@@ -435,8 +435,8 @@ function renderSetsForm() {
       syncAutofillButton(autoBtn, setData, item.name, setNum);
 
       const refreshSetUi = () => {
-        weightInput.className = inputClassFor(setData);
-        repsInput.className = inputClassFor(setData);
+        weightInput.className = inputClassFor(setData, "weight");
+        repsInput.className = inputClassFor(setData, "reps");
         syncAutofillButton(autoBtn, setData, item.name, setNum);
       };
 

@@ -57,6 +57,8 @@ export function createEmptySet(previous) {
     reps: "",
     completed: false,
     source: null,
+    weightSource: null,
+    repsSource: null,
     previousWeight: previous?.weight ?? null,
     previousReps: previous?.reps ?? null,
   };
@@ -242,26 +244,65 @@ export function hasPreviousSet(setData) {
  * Copy previous weight/reps into the live fields and mark source as "previous".
  * @returns {boolean} whether the set newly completed (start rest timer)
  */
+function syncSetSource(setData) {
+  const sources = [setData.weightSource, setData.repsSource].filter(Boolean);
+  if (sources.length === 0) {
+    setData.source = null;
+  } else if (sources.every((s) => s === "previous")) {
+    setData.source = "previous";
+  } else {
+    setData.source = "typed";
+  }
+}
+
+/**
+ * Copy previous weight/reps into the live fields and mark source as "previous".
+ * @returns {boolean} whether the set newly completed (start rest timer)
+ */
 export function applyPreviousSet(setData) {
   if (!hasPreviousSet(setData)) return false;
-  setData.weight = isPresent(setData.previousWeight) ? String(setData.previousWeight) : "";
-  setData.reps = isPresent(setData.previousReps) ? String(setData.previousReps) : "";
-  setData.source = "previous";
+  if (isPresent(setData.previousWeight)) {
+    setData.weight = String(setData.previousWeight);
+    setData.weightSource = "previous";
+  } else {
+    setData.weight = "";
+    setData.weightSource = null;
+  }
+  if (isPresent(setData.previousReps)) {
+    setData.reps = String(setData.previousReps);
+    setData.repsSource = "previous";
+  } else {
+    setData.reps = "";
+    setData.repsSource = null;
+  }
+  syncSetSource(setData);
   return handleSetCompletion(setData);
 }
 
 /**
- * User typed a value — mark source as "typed" so styling differs from autofill.
+ * User typed a value — mark that field as "typed" so styling differs from autofill.
  * @returns {boolean} whether the set newly completed
  */
 export function updateSetField(setData, field, value) {
   setData[field] = value;
-  setData.source = "typed";
+  const sourceField = field === "weight" ? "weightSource" : "repsSource";
+  setData[sourceField] = value === "" ? null : "typed";
+  syncSetSource(setData);
   return handleSetCompletion(setData);
 }
 
 /**
- * CSS-facing source for an input: empty | previous | typed
+ * CSS-facing source for one input: empty | previous | typed
+ */
+export function fieldInputSource(setData, field) {
+  const value = field === "weight" ? setData?.weight : setData?.reps;
+  if (!isPresent(value)) return null;
+  const source = field === "weight" ? setData.weightSource : setData.repsSource;
+  return source === "previous" ? "previous" : "typed";
+}
+
+/**
+ * CSS-facing source for a set (used when both fields share a style).
  */
 export function setInputSource(setData) {
   if (!isPresent(setData?.weight) && !isPresent(setData?.reps)) return null;

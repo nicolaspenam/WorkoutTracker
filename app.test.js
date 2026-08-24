@@ -24,6 +24,7 @@ import {
   hasPreviousSet,
   applyPreviousSet,
   updateSetField,
+  fieldInputSource,
   setInputSource,
   addSet,
   removeSet,
@@ -273,14 +274,17 @@ describe("previous sets", () => {
     assert.equal(set.completed, true);
     assert.equal(justCompleted, true);
     assert.equal(setInputSource(set), "previous");
+    assert.equal(fieldInputSource(set, "weight"), "previous");
+    assert.equal(fieldInputSource(set, "reps"), "previous");
   });
 
-  test("typing after autofill switches the source to typed", () => {
+  test("typing after autofill switches only that field to typed", () => {
     const set = createEmptySet({ weight: 135, reps: 8 });
     applyPreviousSet(set);
     updateSetField(set, "weight", "140");
     assert.equal(set.source, "typed");
-    assert.equal(setInputSource(set), "typed");
+    assert.equal(fieldInputSource(set, "weight"), "typed");
+    assert.equal(fieldInputSource(set, "reps"), "previous");
     assert.equal(set.previousWeight, 135, "previous hint stays visible");
   });
 
