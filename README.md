@@ -1,26 +1,39 @@
 # Workout Tracker
 
-A simple, mobile-friendly workout tracker built with vanilla HTML, CSS, and JavaScript.
+A simple, mobile-friendly workout tracker built with vanilla HTML, CSS, and JavaScript. Workouts are saved in your browser (`localStorage`) so you can reuse them and track PRs over time.
 
 ## Features
 
-- Build a workout by selecting exercises from a dropdown
-- Add one or more exercises to your session
-- Log weight and reps for 3 sets per exercise
-- Finish workout and view a summary
+- Build a workout from a dropdown, or reuse a previous session from **History**
+- Optional name for each workout (e.g. “Push Day”)
+- Log weight and reps per set, with add/remove set controls
+- See last time’s weight/reps for each set and tap **✓** to copy them
+- Previous numbers stay in amber; values you type or confirm use a green style
+- Rest timer starts when a set is completed
+- Look up personal records (heaviest set, then most reps) from the **PRs** tab
+- Finish a workout to save it and view a summary
 
 ## Getting Started
 
-Open `index.html` in your browser — no build step or server required.
+Serve the folder (ES modules need a local server, not `file://`):
 
 ```bash
-# Optional: serve locally
 npx serve .
 ```
 
+Then open the URL in your phone or browser.
+
 ## Usage
 
-1. Pick an exercise from the dropdown and click **Add**
-2. Repeat until your workout is ready, then click **Start Workout**
-3. Enter weight (lbs) and reps for each set
-4. Click **Finish Workout** to see your summary
+1. Optionally name the workout, then add exercises — or open **History** and tap **Use workout**
+2. Tap **Start Workout**
+3. Enter weight and reps, or tap **✓** to fill last time’s numbers for that set
+4. Use **+** / **−** to add or remove sets
+5. **Finish Workout** saves the session and updates PRs
+6. Search an exercise on the **PRs** tab to see your best set
+
+## Tests
+
+```bash
+node app.test.js
+```

@@ -1,5 +1,8 @@
 {
   "name": "workout-tracker",
   "version": "1.0.0",
-  "type": "module"
+  "type": "module",
+  "scripts": {
+    "test": "node app.test.js"
+  }
 }
