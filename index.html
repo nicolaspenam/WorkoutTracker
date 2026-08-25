@@ -61,6 +61,25 @@
 
       <div id="panel-history" class="tab-panel hidden" role="tabpanel" hidden>
         <div class="card">
+          <h2 class="card-title">Backup</h2>
+          <p class="card-help">Download a JSON snapshot to move devices or keep a copy in Drive / iCloud. Import it here to restore.</p>
+          <div class="backup-actions">
+            <button type="button" id="export-btn" class="btn btn-secondary">Export backup</button>
+            <button type="button" id="import-btn" class="btn btn-secondary">Import backup</button>
+          </div>
+          <input type="file" id="import-file" accept="application/json,.json" hidden>
+          <p id="backup-status" class="backup-status" role="status"></p>
+          <div id="import-confirm" class="import-confirm hidden">
+            <p id="import-confirm-text" class="import-confirm-text"></p>
+            <div class="backup-actions">
+              <button type="button" id="import-merge-btn" class="btn btn-primary">Merge</button>
+              <button type="button" id="import-replace-btn" class="btn btn-secondary">Replace</button>
+              <button type="button" id="import-cancel-btn" class="btn btn-danger">Cancel</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
           <h2 class="card-title">Previous workouts</h2>
           <p class="card-help">Reuse a saved session instead of building from scratch.</p>
           <ul id="saved-workouts-list" class="saved-list"></ul>

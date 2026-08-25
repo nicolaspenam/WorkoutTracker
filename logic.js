@@ -428,6 +428,108 @@ export function serializeState(workouts) {
   return JSON.stringify({ workouts: workouts || [] });
 }
 
+export const EXPORT_APP_ID = "workout-tracker";
+export const EXPORT_FORMAT_VERSION = 1;
+
+/**
+ * Normalize a loosely-shaped workout from storage or a backup file.
+ * @returns {object|null}
+ */
+export function normalizeWorkout(raw) {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  if (!Array.isArray(raw.exercises)) return null;
+  return {
+    id: typeof raw.id === "string" && raw.id.trim() ? raw.id.trim() : createId(),
+    name: typeof raw.name === "string" && raw.name.trim() ? raw.name.trim() : null,
+    completedAt: typeof raw.completedAt === "string" ? raw.completedAt : null,
+    exercises: raw.exercises,
+  };
+}
+
+/**
+ * @param {Date} [date]
+ */
+export function exportFilename(date = new Date()) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `workout-tracker-${y}-${m}-${d}.json`;
+}
+
+export function buildExportPayload(workouts, exportedAt = new Date().toISOString()) {
+  return {
+    app: EXPORT_APP_ID,
+    version: EXPORT_FORMAT_VERSION,
+    exportedAt,
+    workouts: (workouts || []).map(normalizeWorkout).filter(Boolean),
+  };
+}
+
+/**
+ * Accepts our backup file, the raw localStorage blob, or a bare workouts array.
+ * @param {string|object} raw
+ * @returns {{ ok: true, workouts: object[], exportedAt: string|null } | { ok: false, error: string }}
+ */
+export function parseImportPayload(raw) {
+  let data;
+  try {
+    data = typeof raw === "string" ? JSON.parse(raw) : raw;
+  } catch {
+    return { ok: false, error: "Could not read that file. Use a JSON backup from this app." };
+  }
+
+  let list;
+  if (Array.isArray(data)) {
+    list = data;
+  } else if (data && Array.isArray(data.workouts)) {
+    list = data.workouts;
+  } else {
+    return { ok: false, error: "That file does not look like a workout backup." };
+  }
+
+  const workouts = list.map(normalizeWorkout).filter(Boolean);
+  if (list.length > 0 && workouts.length === 0) {
+    return { ok: false, error: "No valid workouts found in that backup." };
+  }
+
+  return {
+    ok: true,
+    workouts,
+    exportedAt: typeof data?.exportedAt === "string" ? data.exportedAt : null,
+  };
+}
+
+/**
+ * Combine two histories. Matching ids keep the existing session; new ids are added.
+ * Result is newest-first by completedAt.
+ */
+export function mergeWorkouts(existing, incoming) {
+  const byId = new Map();
+  for (const workout of existing || []) {
+    const normalized = normalizeWorkout(workout);
+    if (normalized) byId.set(normalized.id, normalized);
+  }
+
+  let added = 0;
+  let skipped = 0;
+  for (const workout of incoming || []) {
+    const normalized = normalizeWorkout(workout);
+    if (!normalized) continue;
+    if (byId.has(normalized.id)) {
+      skipped += 1;
+      continue;
+    }
+    byId.set(normalized.id, normalized);
+    added += 1;
+  }
+
+  const merged = [...byId.values()].sort((a, b) => {
+    return (Date.parse(b.completedAt || "") || 0) - (Date.parse(a.completedAt || "") || 0);
+  });
+
+  return { workouts: merged, added, skipped };
+}
+
 /**
  * Persist a completed session onto the history list (newest first).
  */

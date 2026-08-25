@@ -284,6 +284,50 @@ body {
   padding: 0.9rem;
 }
 
+.backup-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+}
+
+.backup-actions .btn {
+  width: 100%;
+}
+
+.backup-status {
+  min-height: 1.2rem;
+  margin-top: 0.75rem;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.backup-status.error {
+  color: var(--danger);
+}
+
+.backup-status.success {
+  color: var(--success);
+}
+
+.import-confirm {
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border);
+}
+
+.import-confirm.hidden {
+  display: none;
+}
+
+.import-confirm-text {
+  font-size: 0.9rem;
+  margin-bottom: 0.75rem;
+}
+
+.import-confirm .backup-actions {
+  grid-template-columns: 1fr 1fr 1fr;
+}
+
 .btn-sticky {
   position: sticky;
   bottom: calc(0.6rem + env(safe-area-inset-bottom, 0px));
@@ -725,6 +769,10 @@ body {
 
   .exercise-header {
     flex-wrap: wrap;
+  }
+
+  .import-confirm .backup-actions {
+    grid-template-columns: 1fr;
   }
 }
 

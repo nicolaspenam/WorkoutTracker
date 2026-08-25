@@ -37,6 +37,11 @@ import {
   serializeState,
   saveCompletedWorkout,
   renameWorkout,
+  buildExportPayload,
+  parseImportPayload,
+  mergeWorkouts,
+  exportFilename,
+  EXPORT_FORMAT_VERSION,
 } from "./logic.js";
 
 // ─── formatTime ───────────────────────────────────────────────────────────────
@@ -473,5 +478,77 @@ describe("storage helpers", () => {
     const next = renameWorkout(workouts, "a", "New Name");
     assert.equal(next[0].name, "New Name");
     assert.equal(next[1].name, "Keep");
+  });
+});
+
+describe("export / import", () => {
+  const sample = [
+    {
+      id: "w1",
+      name: "Push Day",
+      completedAt: "2026-08-24T12:00:00Z",
+      exercises: [{ name: "Bench Press", sets: [{ set: 1, weight: 135, reps: 8 }] }],
+    },
+  ];
+
+  test("exportFilename uses a calendar date", () => {
+    assert.equal(exportFilename(new Date("2026-08-25T15:00:00")), "workout-tracker-2026-08-25.json");
+  });
+
+  test("buildExportPayload wraps workouts with app metadata", () => {
+    const payload = buildExportPayload(sample, "2026-08-25T00:00:00Z");
+    assert.equal(payload.app, "workout-tracker");
+    assert.equal(payload.version, EXPORT_FORMAT_VERSION);
+    assert.equal(payload.exportedAt, "2026-08-25T00:00:00Z");
+    assert.equal(payload.workouts[0].id, "w1");
+  });
+
+  test("parseImportPayload reads the backup format", () => {
+    const json = JSON.stringify(buildExportPayload(sample, "2026-08-25T00:00:00Z"));
+    const parsed = parseImportPayload(json);
+    assert.equal(parsed.ok, true);
+    assert.equal(parsed.workouts.length, 1);
+    assert.equal(parsed.workouts[0].name, "Push Day");
+  });
+
+  test("parseImportPayload also accepts a raw { workouts } blob", () => {
+    const parsed = parseImportPayload(JSON.stringify({ workouts: sample }));
+    assert.equal(parsed.ok, true);
+    assert.equal(parsed.workouts[0].id, "w1");
+  });
+
+  test("parseImportPayload rejects junk", () => {
+    const badJson = parseImportPayload("{not json");
+    assert.equal(badJson.ok, false);
+    const wrongShape = parseImportPayload(JSON.stringify({ foo: 1 }));
+    assert.equal(wrongShape.ok, false);
+  });
+
+  test("parseImportPayload assigns ids when a backup omitted them", () => {
+    const parsed = parseImportPayload(
+      JSON.stringify({
+        workouts: [{ name: "Unnamed", exercises: [], completedAt: "2026-08-01T00:00:00Z" }],
+      })
+    );
+    assert.equal(parsed.ok, true);
+    assert.ok(parsed.workouts[0].id);
+  });
+
+  test("mergeWorkouts adds new ids and skips duplicates", () => {
+    const existing = sample;
+    const incoming = [
+      sample[0],
+      {
+        id: "w2",
+        name: "Leg Day",
+        completedAt: "2026-08-25T12:00:00Z",
+        exercises: [{ name: "Squat", sets: [{ set: 1, weight: 225, reps: 5 }] }],
+      },
+    ];
+    const result = mergeWorkouts(existing, incoming);
+    assert.equal(result.added, 1);
+    assert.equal(result.skipped, 1);
+    assert.equal(result.workouts.length, 2);
+    assert.equal(result.workouts[0].id, "w2", "newest first");
   });
 });

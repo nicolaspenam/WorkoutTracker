@@ -26,6 +26,10 @@ import {
   serializeState,
   saveCompletedWorkout,
   renameWorkout,
+  buildExportPayload,
+  parseImportPayload,
+  mergeWorkouts,
+  exportFilename,
 } from "./logic.js";
 
 const buildPhase = document.getElementById("build-phase");
@@ -46,6 +50,15 @@ const summaryNameInput = document.getElementById("summary-name");
 const savedWorkoutsList = document.getElementById("saved-workouts-list");
 const prSearch = document.getElementById("pr-search");
 const prResults = document.getElementById("pr-results");
+const exportBtn = document.getElementById("export-btn");
+const importBtn = document.getElementById("import-btn");
+const importFileInput = document.getElementById("import-file");
+const backupStatus = document.getElementById("backup-status");
+const importConfirm = document.getElementById("import-confirm");
+const importConfirmText = document.getElementById("import-confirm-text");
+const importMergeBtn = document.getElementById("import-merge-btn");
+const importReplaceBtn = document.getElementById("import-replace-btn");
+const importCancelBtn = document.getElementById("import-cancel-btn");
 
 const restTimerBar = document.getElementById("rest-timer-bar");
 const timerDisplay = document.getElementById("timer-display");
@@ -57,6 +70,7 @@ let savedWorkoutId = null;
 let timerInterval = null;
 let timerSecondsLeft = 0;
 let activeTab = "workout";
+let pendingImport = null;
 
 function loadWorkouts() {
   try {
@@ -66,12 +80,106 @@ function loadWorkouts() {
   }
 }
 
-function persistWorkouts() {
-  try {
-    localStorage.setItem(STORAGE_KEY, serializeState(savedWorkouts));
-  } catch {
-    // Storage may be unavailable (private mode / quota). Keep working in-memory.
+function setBackupStatus(message, kind) {
+  backupStatus.textContent = message || "";
+  backupStatus.classList.toggle("error", kind === "error");
+  backupStatus.classList.toggle("success", kind === "success");
+}
+
+function hideImportConfirm() {
+  pendingImport = null;
+  importConfirm.classList.add("hidden");
+  importFileInput.value = "";
+}
+
+function applyImportedWorkouts(workouts, mode) {
+  if (mode === "replace") {
+    savedWorkouts = workouts;
+    setBackupStatus(`Replaced history with ${workouts.length} workout${workouts.length !== 1 ? "s" : ""}.`, "success");
+  } else {
+    const result = mergeWorkouts(savedWorkouts, workouts);
+    savedWorkouts = result.workouts;
+    const parts = [`Added ${result.added} workout${result.added !== 1 ? "s" : ""}`];
+    if (result.skipped) {
+      parts.push(`${result.skipped} already present`);
+    }
+    setBackupStatus(`${parts.join(", ")}.`, "success");
   }
+  persistWorkouts();
+  renderSavedWorkouts();
+  renderPersonalRecords();
+  hideImportConfirm();
+}
+
+function downloadBackupFile(filename, json) {
+  const blob = new Blob([json], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
+async function exportBackup() {
+  const payload = buildExportPayload(savedWorkouts);
+  const json = JSON.stringify(payload, null, 2);
+  const filename = exportFilename();
+  const blob = new Blob([json], { type: "application/json" });
+  const file = new File([blob], filename, { type: "application/json" });
+
+  if (navigator.share && navigator.canShare?.({ files: [file] })) {
+    try {
+      await navigator.share({
+        files: [file],
+        title: "Workout tracker backup",
+        text: "Workout tracker backup",
+      });
+      setBackupStatus(`Shared ${filename}. Save it somewhere you can find later.`, "success");
+      return;
+    } catch (error) {
+      if (error?.name === "AbortError") return;
+    }
+  }
+
+  downloadBackupFile(filename, json);
+  setBackupStatus(`Downloaded ${filename}. Keep a copy in Drive, iCloud, or email.`, "success");
+}
+
+function promptImportChoice(workouts) {
+  pendingImport = workouts;
+  importConfirmText.textContent =
+    `This backup has ${workouts.length} workout${workouts.length !== 1 ? "s" : ""}. ` +
+    `You already have ${savedWorkouts.length}. Merge keeps both; Replace overwrites this device.`;
+  importConfirm.classList.remove("hidden");
+}
+
+async function handleImportFile(file) {
+  if (!file) return;
+  let text;
+  try {
+    text = await file.text();
+  } catch {
+    setBackupStatus("Could not read that file.", "error");
+    importFileInput.value = "";
+    return;
+  }
+
+  const parsed = parseImportPayload(text);
+  if (!parsed.ok) {
+    setBackupStatus(parsed.error, "error");
+    importFileInput.value = "";
+    return;
+  }
+
+  if (savedWorkouts.length === 0) {
+    applyImportedWorkouts(parsed.workouts, "replace");
+    return;
+  }
+
+  promptImportChoice(parsed.workouts);
 }
 
 function startRestTimer(duration = DEFAULT_REST_SECONDS) {
@@ -597,6 +705,29 @@ function bindEvents() {
 
   document.querySelectorAll(".tab").forEach((btn) => {
     btn.addEventListener("click", () => setActiveTab(btn.dataset.tab));
+  });
+
+  exportBtn.addEventListener("click", () => {
+    exportBackup();
+  });
+  importBtn.addEventListener("click", () => {
+    hideImportConfirm();
+    setBackupStatus("");
+    importFileInput.click();
+  });
+  importFileInput.addEventListener("change", () => {
+    const file = importFileInput.files?.[0];
+    handleImportFile(file);
+  });
+  importMergeBtn.addEventListener("click", () => {
+    if (pendingImport) applyImportedWorkouts(pendingImport, "merge");
+  });
+  importReplaceBtn.addEventListener("click", () => {
+    if (pendingImport) applyImportedWorkouts(pendingImport, "replace");
+  });
+  importCancelBtn.addEventListener("click", () => {
+    hideImportConfirm();
+    setBackupStatus("Import cancelled.");
   });
 }
 

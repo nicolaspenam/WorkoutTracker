@@ -12,6 +12,7 @@ A simple, mobile-friendly workout tracker built with vanilla HTML, CSS, and Java
 - Rest timer starts when a set is completed
 - Look up personal records (heaviest set, then most reps) from the **PRs** tab
 - Finish a workout to save it and view a summary
+- **Export / import** a JSON backup from History to move devices or keep a snapshot off-browser
 
 ## Getting Started
 
@@ -31,6 +32,7 @@ Then open the URL in your phone or browser.
 4. Use **+** / **−** to add or remove sets
 5. **Finish Workout** saves the session and updates PRs
 6. Search an exercise on the **PRs** tab to see your best set
+7. On **History**, use **Export backup** to download a JSON file (save it to Drive/iCloud). **Import backup** restores it — merge keeps existing sessions, replace overwrites this device
 
 ## Tests
 
