@@ -80,6 +80,14 @@ function loadWorkouts() {
   }
 }
 
+function persistWorkouts() {
+  try {
+    localStorage.setItem(STORAGE_KEY, serializeState(savedWorkouts));
+  } catch {
+    // Storage may be unavailable (private mode / quota). Keep working in-memory.
+  }
+}
+
 function setBackupStatus(message, kind) {
   backupStatus.textContent = message || "";
   backupStatus.classList.toggle("error", kind === "error");
