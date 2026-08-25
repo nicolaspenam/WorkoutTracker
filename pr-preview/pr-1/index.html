@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#0f1419">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Workout Tracker</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app">
+    <header class="header">
+      <h1>Workout Tracker</h1>
+      <p class="subtitle" id="phase-label">Build your workout</p>
+    </header>
+
+    <!-- Phase 1: Build workout -->
+    <section id="build-phase" class="phase">
+      <nav class="tabs" role="tablist" aria-label="Workout sections">
+        <button type="button" class="tab active" role="tab" id="tab-workout" data-tab="workout" aria-selected="true">Workout</button>
+        <button type="button" class="tab" role="tab" id="tab-history" data-tab="history" aria-selected="false">History</button>
+        <button type="button" class="tab" role="tab" id="tab-prs" data-tab="prs" aria-selected="false">PRs</button>
+      </nav>
+
+      <div id="panel-workout" class="tab-panel" role="tabpanel">
+        <div class="card">
+          <label for="workout-name" class="label">Workout name <span class="optional">(optional)</span></label>
+          <input
+            type="text"
+            id="workout-name"
+            class="input"
+            placeholder="e.g. Push Day"
+            autocomplete="off"
+            enterkeyhint="done"
+          >
+        </div>
+
+        <div class="card">
+          <label for="exercise-select" class="label">Add an exercise</label>
+          <div class="add-row">
+            <select id="exercise-select" class="select">
+              <option value="">Choose an exercise…</option>
+            </select>
+            <button type="button" id="add-exercise-btn" class="btn btn-secondary">Add</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2 class="card-title">Your workout</h2>
+          <ul id="exercise-list" class="exercise-list">
+            <li class="empty-state" id="empty-list-msg">No exercises added yet.</li>
+          </ul>
+        </div>
+
+        <button type="button" id="start-workout-btn" class="btn btn-primary btn-full btn-sticky" disabled>
+          Start Workout
+        </button>
+      </div>
+
+      <div id="panel-history" class="tab-panel hidden" role="tabpanel" hidden>
+        <div class="card">
+          <h2 class="card-title">Backup</h2>
+          <p class="card-help">Download a JSON snapshot to move devices or keep a copy in Drive / iCloud. Import it here to restore.</p>
+          <div class="backup-actions">
+            <button type="button" id="export-btn" class="btn btn-secondary">Export backup</button>
+            <button type="button" id="import-btn" class="btn btn-secondary">Import backup</button>
+          </div>
+          <input type="file" id="import-file" accept="application/json,.json" hidden>
+          <p id="backup-status" class="backup-status" role="status"></p>
+          <div id="import-confirm" class="import-confirm hidden">
+            <p id="import-confirm-text" class="import-confirm-text"></p>
+            <div class="backup-actions">
+              <button type="button" id="import-merge-btn" class="btn btn-primary">Merge</button>
+              <button type="button" id="import-replace-btn" class="btn btn-secondary">Replace</button>
+              <button type="button" id="import-cancel-btn" class="btn btn-danger">Cancel</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2 class="card-title">Previous workouts</h2>
+          <p class="card-help">Reuse a saved session instead of building from scratch.</p>
+          <ul id="saved-workouts-list" class="saved-list"></ul>
+        </div>
+      </div>
+
+      <div id="panel-prs" class="tab-panel hidden" role="tabpanel" hidden>
+        <div class="card">
+          <h2 class="card-title">Personal records</h2>
+          <label for="pr-search" class="label">Look up an exercise</label>
+          <input
+            type="search"
+            id="pr-search"
+            class="input"
+            placeholder="Search PRs…"
+            autocomplete="off"
+            enterkeyhint="search"
+          >
+          <ul id="pr-results" class="pr-list"></ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- Phase 2: Track sets -->
+    <section id="track-phase" class="phase hidden">
+      <div id="rest-timer-bar" class="rest-timer-bar hidden">
+        <div class="timer-info">
+          <span class="timer-icon" aria-hidden="true">⏱</span>
+          <span class="timer-title">Rest Timer</span>
+        </div>
+        <div class="timer-countdown" id="timer-display">1:30</div>
+        <button type="button" id="dismiss-timer-btn" class="btn-timer-dismiss" aria-label="Dismiss timer">✕</button>
+      </div>
+
+      <div id="sets-container"></div>
+
+      <button type="button" id="finish-workout-btn" class="btn btn-primary btn-full btn-sticky">
+        Finish Workout
+      </button>
+    </section>
+
+    <!-- Phase 3: Summary -->
+    <section id="summary-phase" class="phase hidden">
+      <div class="card summary-card">
+        <div class="summary-icon" aria-hidden="true">✓</div>
+        <h2>Workout complete!</h2>
+        <p class="summary-meta" id="summary-meta"></p>
+        <label for="summary-name" class="label summary-name-label">Name this workout <span class="optional">(optional)</span></label>
+        <input
+          type="text"
+          id="summary-name"
+          class="input"
+          placeholder="e.g. Push Day"
+          autocomplete="off"
+        >
+        <div id="summary-details"></div>
+      </div>
+
+      <button type="button" id="new-workout-btn" class="btn btn-primary btn-full btn-sticky">
+        Start New Workout
+      </button>
+    </section>
+  </div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>
