@@ -14,6 +14,16 @@ A simple, mobile-friendly workout tracker built with vanilla HTML, CSS, and Java
 - Finish a workout to save it and view a summary
 - **Export / import** a JSON backup from History to move devices or keep a snapshot off-browser
 
+## Live site
+
+https://nicolaspenam.github.io/WorkoutTracker/
+
+Pull requests get a preview of the same site. A GitHub Action posts the link (and a QR code for your phone) on the PR:
+
+`https://nicolaspenam.github.io/WorkoutTracker/pr-preview/pr-<number>/`
+
+That needs **Read and write** permissions under **Settings → Actions → General → Workflow permissions**. Preview files live in `pr-preview/` on `main` and are removed when the PR is closed.
+
 ## Getting Started
 
 Serve the folder (ES modules need a local server, not `file://`):
