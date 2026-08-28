@@ -1,5 +1,6 @@
 import {
   EXERCISES,
+  MUSCLE_GROUPS,
   SETS_PER_EXERCISE,
   DEFAULT_REST_SECONDS,
   STORAGE_KEY,
@@ -30,6 +31,11 @@ import {
   parseImportPayload,
   mergeWorkouts,
   exportFilename,
+  filterExercisesByMuscle,
+  groupExercisesByMuscle,
+  getMuscleForExercise,
+  getMuscleLabel,
+  filterRecordsByMuscle,
 } from "./logic.js";
 
 const buildPhase = document.getElementById("build-phase");
@@ -59,6 +65,8 @@ const importConfirmText = document.getElementById("import-confirm-text");
 const importMergeBtn = document.getElementById("import-merge-btn");
 const importReplaceBtn = document.getElementById("import-replace-btn");
 const importCancelBtn = document.getElementById("import-cancel-btn");
+const muscleFilters = document.getElementById("muscle-filters");
+const prMuscleFilters = document.getElementById("pr-muscle-filters");
 
 const restTimerBar = document.getElementById("rest-timer-bar");
 const timerDisplay = document.getElementById("timer-display");
@@ -71,6 +79,8 @@ let timerInterval = null;
 let timerSecondsLeft = 0;
 let activeTab = "workout";
 let pendingImport = null;
+let muscleFilter = null;
+let prMuscleFilter = null;
 
 function loadWorkouts() {
   try {
@@ -224,12 +234,72 @@ function stopRestTimer() {
 }
 
 function populateDropdown() {
-  EXERCISES.forEach((name) => {
-    const option = document.createElement("option");
-    option.value = name;
-    option.textContent = name;
-    exerciseSelect.appendChild(option);
+  const previousValue = exerciseSelect.value;
+  exerciseSelect.innerHTML = "";
+
+  const placeholder = document.createElement("option");
+  placeholder.value = "";
+  placeholder.textContent = muscleFilter
+    ? `Choose a ${(getMuscleLabel(muscleFilter) || "muscle").toLowerCase()} exercise…`
+    : "Choose an exercise…";
+  exerciseSelect.appendChild(placeholder);
+
+  const filtered = filterExercisesByMuscle(EXERCISES, muscleFilter);
+
+  if (muscleFilter) {
+    filtered
+      .slice()
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .forEach((ex) => {
+        const option = document.createElement("option");
+        option.value = ex.name;
+        option.textContent = ex.name;
+        exerciseSelect.appendChild(option);
+      });
+  } else {
+    groupExercisesByMuscle(filtered).forEach((group) => {
+      const optgroup = document.createElement("optgroup");
+      optgroup.label = group.label;
+      group.exercises.forEach((ex) => {
+        const option = document.createElement("option");
+        option.value = ex.name;
+        option.textContent = ex.name;
+        optgroup.appendChild(option);
+      });
+      exerciseSelect.appendChild(optgroup);
+    });
+  }
+
+  if ([...exerciseSelect.options].some((opt) => opt.value === previousValue)) {
+    exerciseSelect.value = previousValue;
+  }
+}
+
+function renderMuscleChips(container, selectedId, onSelect) {
+  container.innerHTML = "";
+
+  const chips = [{ id: null, label: "All" }, ...MUSCLE_GROUPS];
+  chips.forEach((group) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "muscle-chip" + (selectedId === group.id ? " active" : "");
+    btn.textContent = group.label;
+    btn.setAttribute("aria-pressed", selectedId === group.id ? "true" : "false");
+    btn.addEventListener("click", () => onSelect(group.id));
+    container.appendChild(btn);
   });
+}
+
+function setMuscleFilter(muscleId) {
+  muscleFilter = muscleId;
+  renderMuscleChips(muscleFilters, muscleFilter, setMuscleFilter);
+  populateDropdown();
+}
+
+function setPrMuscleFilter(muscleId) {
+  prMuscleFilter = muscleId;
+  renderMuscleChips(prMuscleFilters, prMuscleFilter, setPrMuscleFilter);
+  renderPersonalRecords();
 }
 
 function personalRecords() {
@@ -254,7 +324,11 @@ function renderExerciseList() {
 
     const left = document.createElement("span");
     left.className = "name";
-    left.innerHTML = `<span class="index">${index + 1}.</span>${item.name}`;
+    const muscleId = getMuscleForExercise(item.name);
+    const muscleName = muscleId ? getMuscleLabel(muscleId) : "";
+    left.innerHTML = `<span class="index">${index + 1}.</span>${item.name}${
+      muscleName ? `<span class="muscle">${muscleName}</span>` : ""
+    }`;
 
     const removeBtn = document.createElement("button");
     removeBtn.type = "button";
@@ -383,7 +457,10 @@ function renderSavedWorkouts() {
 }
 
 function renderPersonalRecords() {
-  const records = queryPersonalRecords(personalRecords(), prSearch.value);
+  const records = filterRecordsByMuscle(
+    queryPersonalRecords(personalRecords(), prSearch.value),
+    prMuscleFilter
+  );
   prResults.innerHTML = "";
 
   if (records.length === 0) {
@@ -740,6 +817,8 @@ function bindEvents() {
 }
 
 savedWorkouts = loadWorkouts();
+renderMuscleChips(muscleFilters, muscleFilter, setMuscleFilter);
+renderMuscleChips(prMuscleFilters, prMuscleFilter, setPrMuscleFilter);
 populateDropdown();
 renderExerciseList();
 renderSavedWorkouts();

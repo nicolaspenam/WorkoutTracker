@@ -42,6 +42,13 @@ import {
   mergeWorkouts,
   exportFilename,
   EXPORT_FORMAT_VERSION,
+  EXERCISES,
+  MUSCLE_GROUPS,
+  filterExercisesByMuscle,
+  groupExercisesByMuscle,
+  getMuscleForExercise,
+  getMuscleLabel,
+  filterRecordsByMuscle,
 } from "./logic.js";
 
 // ─── formatTime ───────────────────────────────────────────────────────────────
@@ -550,5 +557,79 @@ describe("export / import", () => {
     assert.equal(result.skipped, 1);
     assert.equal(result.workouts.length, 2);
     assert.equal(result.workouts[0].id, "w2", "newest first");
+  });
+});
+
+describe("exercise catalog / muscle filter", () => {
+  test("keeps the original exercise names", () => {
+    const names = EXERCISES.map((ex) => ex.name);
+    for (const name of [
+      "Bench Press",
+      "Squat",
+      "Deadlift",
+      "Overhead Press",
+      "Barbell Row",
+      "Pull-ups",
+      "Dumbbell Curl",
+      "Tricep Pushdown",
+      "Leg Press",
+      "Lat Pulldown",
+      "Romanian Deadlift",
+      "Incline Bench Press",
+      "Lateral Raise",
+      "Cable Fly",
+      "Plank",
+    ]) {
+      assert.ok(names.includes(name), `missing ${name}`);
+    }
+  });
+
+  test("every exercise has a known muscle group", () => {
+    const ids = new Set(MUSCLE_GROUPS.map((g) => g.id));
+    for (const ex of EXERCISES) {
+      assert.ok(ids.has(ex.muscle), `${ex.name} has unknown muscle ${ex.muscle}`);
+    }
+  });
+
+  test("exercise names are unique", () => {
+    const names = EXERCISES.map((ex) => ex.name);
+    assert.equal(names.length, new Set(names).size);
+  });
+
+  test("unknown muscle id yields no exercises", () => {
+    assert.deepEqual(filterExercisesByMuscle(EXERCISES, "forearms"), []);
+  });
+
+  test("filterExercisesByMuscle returns only that muscle, or all when unset", () => {
+    const chest = filterExercisesByMuscle(EXERCISES, "chest");
+    assert.ok(chest.length > 0);
+    assert.ok(chest.every((ex) => ex.muscle === "chest"));
+    assert.ok(chest.some((ex) => ex.name === "Bench Press"));
+    assert.equal(filterExercisesByMuscle(EXERCISES, null).length, EXERCISES.length);
+  });
+
+  test("groupExercisesByMuscle follows catalog order and sorts names", () => {
+    const groups = groupExercisesByMuscle(EXERCISES);
+    assert.equal(groups[0].id, "chest");
+    const chestNames = groups[0].exercises.map((ex) => ex.name);
+    assert.deepEqual(chestNames, [...chestNames].sort((a, b) => a.localeCompare(b)));
+    assert.ok(MUSCLE_GROUPS.every((g) => groups.some((listed) => listed.id === g.id)));
+  });
+
+  test("getMuscleForExercise maps names to groups", () => {
+    assert.equal(getMuscleForExercise("Squat"), "quads");
+    assert.equal(getMuscleLabel("quads"), "Quads");
+    assert.equal(getMuscleForExercise("Unknown Move"), null);
+  });
+
+  test("filterRecordsByMuscle keeps matching PR names", () => {
+    const records = [
+      { name: "Bench Press", weight: 185, reps: 5 },
+      { name: "Squat", weight: 315, reps: 1 },
+      { name: "Mystery Lift", weight: 90, reps: 10 },
+    ];
+    const chest = filterRecordsByMuscle(records, "chest");
+    assert.deepEqual(chest.map((r) => r.name), ["Bench Press"]);
+    assert.equal(filterRecordsByMuscle(records, null).length, 3);
   });
 });

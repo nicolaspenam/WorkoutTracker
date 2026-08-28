@@ -7,23 +7,166 @@ export const SETS_PER_EXERCISE = 3;
 export const DEFAULT_REST_SECONDS = 90;
 export const STORAGE_KEY = "workout-tracker-v1";
 
-export const EXERCISES = [
-  "Bench Press",
-  "Squat",
-  "Deadlift",
-  "Overhead Press",
-  "Barbell Row",
-  "Pull-ups",
-  "Dumbbell Curl",
-  "Tricep Pushdown",
-  "Leg Press",
-  "Lat Pulldown",
-  "Romanian Deadlift",
-  "Incline Bench Press",
-  "Lateral Raise",
-  "Cable Fly",
-  "Plank",
+/**
+ * Primary muscle groups used to prefilter the exercise list.
+ * Compound lifts are tagged by the main target, not every muscle involved.
+ */
+export const MUSCLE_GROUPS = [
+  { id: "chest", label: "Chest" },
+  { id: "back", label: "Back" },
+  { id: "shoulders", label: "Shoulders" },
+  { id: "biceps", label: "Biceps" },
+  { id: "triceps", label: "Triceps" },
+  { id: "quads", label: "Quads" },
+  { id: "hamstrings", label: "Hamstrings" },
+  { id: "glutes", label: "Glutes" },
+  { id: "calves", label: "Calves" },
+  { id: "core", label: "Core" },
 ];
+
+export const EXERCISES = [
+  // Chest
+  { name: "Bench Press", muscle: "chest" },
+  { name: "Incline Bench Press", muscle: "chest" },
+  { name: "Decline Bench Press", muscle: "chest" },
+  { name: "Dumbbell Bench Press", muscle: "chest" },
+  { name: "Incline Dumbbell Press", muscle: "chest" },
+  { name: "Chest Press Machine", muscle: "chest" },
+  { name: "Cable Fly", muscle: "chest" },
+  { name: "Dumbbell Fly", muscle: "chest" },
+  { name: "Pec Deck", muscle: "chest" },
+  { name: "Push-ups", muscle: "chest" },
+  { name: "Dips", muscle: "chest" },
+
+  // Back
+  { name: "Deadlift", muscle: "back" },
+  { name: "Barbell Row", muscle: "back" },
+  { name: "Dumbbell Row", muscle: "back" },
+  { name: "Seated Cable Row", muscle: "back" },
+  { name: "T-Bar Row", muscle: "back" },
+  { name: "Chest-Supported Row", muscle: "back" },
+  { name: "Pull-ups", muscle: "back" },
+  { name: "Chin-ups", muscle: "back" },
+  { name: "Lat Pulldown", muscle: "back" },
+  { name: "Straight-Arm Pulldown", muscle: "back" },
+  { name: "Inverted Row", muscle: "back" },
+  { name: "Shrugs", muscle: "back" },
+
+  // Shoulders
+  { name: "Overhead Press", muscle: "shoulders" },
+  { name: "Dumbbell Shoulder Press", muscle: "shoulders" },
+  { name: "Arnold Press", muscle: "shoulders" },
+  { name: "Lateral Raise", muscle: "shoulders" },
+  { name: "Cable Lateral Raise", muscle: "shoulders" },
+  { name: "Front Raise", muscle: "shoulders" },
+  { name: "Rear Delt Fly", muscle: "shoulders" },
+  { name: "Face Pulls", muscle: "shoulders" },
+  { name: "Upright Row", muscle: "shoulders" },
+
+  // Biceps
+  { name: "Dumbbell Curl", muscle: "biceps" },
+  { name: "Barbell Curl", muscle: "biceps" },
+  { name: "Hammer Curl", muscle: "biceps" },
+  { name: "Preacher Curl", muscle: "biceps" },
+  { name: "Incline Dumbbell Curl", muscle: "biceps" },
+  { name: "Cable Curl", muscle: "biceps" },
+  { name: "Concentration Curl", muscle: "biceps" },
+
+  // Triceps
+  { name: "Tricep Pushdown", muscle: "triceps" },
+  { name: "Rope Pushdown", muscle: "triceps" },
+  { name: "Skull Crushers", muscle: "triceps" },
+  { name: "Overhead Tricep Extension", muscle: "triceps" },
+  { name: "Close-Grip Bench Press", muscle: "triceps" },
+  { name: "Tricep Dips", muscle: "triceps" },
+  { name: "Kickbacks", muscle: "triceps" },
+
+  // Quads
+  { name: "Squat", muscle: "quads" },
+  { name: "Front Squat", muscle: "quads" },
+  { name: "Goblet Squat", muscle: "quads" },
+  { name: "Hack Squat", muscle: "quads" },
+  { name: "Leg Press", muscle: "quads" },
+  { name: "Bulgarian Split Squat", muscle: "quads" },
+  { name: "Walking Lunge", muscle: "quads" },
+  { name: "Leg Extension", muscle: "quads" },
+  { name: "Step-up", muscle: "quads" },
+
+  // Hamstrings
+  { name: "Romanian Deadlift", muscle: "hamstrings" },
+  { name: "Stiff-Leg Deadlift", muscle: "hamstrings" },
+  { name: "Lying Leg Curl", muscle: "hamstrings" },
+  { name: "Seated Leg Curl", muscle: "hamstrings" },
+  { name: "Nordic Curl", muscle: "hamstrings" },
+  { name: "Good Morning", muscle: "hamstrings" },
+
+  // Glutes
+  { name: "Hip Thrust", muscle: "glutes" },
+  { name: "Glute Bridge", muscle: "glutes" },
+  { name: "Sumo Deadlift", muscle: "glutes" },
+  { name: "Cable Kickback", muscle: "glutes" },
+  { name: "Hip Abduction", muscle: "glutes" },
+  { name: "Reverse Lunge", muscle: "glutes" },
+
+  // Calves
+  { name: "Standing Calf Raise", muscle: "calves" },
+  { name: "Seated Calf Raise", muscle: "calves" },
+  { name: "Donkey Calf Raise", muscle: "calves" },
+
+  // Core
+  { name: "Plank", muscle: "core" },
+  { name: "Side Plank", muscle: "core" },
+  { name: "Hanging Leg Raise", muscle: "core" },
+  { name: "Cable Crunch", muscle: "core" },
+  { name: "Ab Wheel", muscle: "core" },
+  { name: "Russian Twist", muscle: "core" },
+  { name: "Pallof Press", muscle: "core" },
+  { name: "Dead Bug", muscle: "core" },
+];
+
+/**
+ * @param {Array<{ name: string, muscle: string }>} [exercises]
+ * @param {string|null} [muscleId]
+ */
+export function filterExercisesByMuscle(exercises = EXERCISES, muscleId = null) {
+  if (!muscleId) return [...exercises];
+  return exercises.filter((ex) => ex.muscle === muscleId);
+}
+
+/**
+ * Group exercises in MUSCLE_GROUPS order for optgroup dropdowns.
+ * @param {Array<{ name: string, muscle: string }>} [exercises]
+ */
+export function groupExercisesByMuscle(exercises = EXERCISES) {
+  return MUSCLE_GROUPS.map((group) => ({
+    id: group.id,
+    label: group.label,
+    exercises: exercises
+      .filter((ex) => ex.muscle === group.id)
+      .slice()
+      .sort((a, b) => a.name.localeCompare(b.name)),
+  })).filter((group) => group.exercises.length > 0);
+}
+
+export function getMuscleForExercise(name, exercises = EXERCISES) {
+  return exercises.find((ex) => ex.name === name)?.muscle ?? null;
+}
+
+export function getMuscleLabel(muscleId) {
+  return MUSCLE_GROUPS.find((group) => group.id === muscleId)?.label ?? null;
+}
+
+/**
+ * Keep PR rows whose catalog exercise matches the selected muscle.
+ * Unknown names (not in the catalog) only appear when no muscle is selected.
+ */
+export function filterRecordsByMuscle(records, muscleId, exercises = EXERCISES) {
+  if (!muscleId) return [...(records || [])];
+  const names = new Set(
+    exercises.filter((ex) => ex.muscle === muscleId).map((ex) => ex.name)
+  );
+  return (records || []).filter((record) => names.has(record.name));
+}
 
 /**
  * Format a number of seconds as "m:ss".
