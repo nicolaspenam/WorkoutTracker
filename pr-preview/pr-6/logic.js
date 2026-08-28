@@ -891,7 +891,8 @@ export function muscleTrainingStats(workouts, now = new Date(), exercises = EXER
     for (const ex of workout.exercises || []) {
       const muscle = getMuscleForExercise(ex.name, exercises);
       if (!muscle || !stats[muscle]) continue;
-      const loggedSets = (ex.sets || []).filter(isLoggedSet).length || (ex.sets || []).length;
+      const loggedSets = (ex.sets || []).filter(isLoggedSet).length;
+      if (loggedSets === 0) continue;
       if (recent) stats[muscle].weeklySets += loggedSets;
       if (!stats[muscle].lastTrainedAt || at > new Date(stats[muscle].lastTrainedAt)) {
         stats[muscle].lastTrainedAt = workout.completedAt;
@@ -1169,10 +1170,27 @@ export function collectWorkoutData(selectedExercises, unit = "lb") {
 }
 
 /**
+ * Drop unlogged sets and exercises that were planned but never filled in.
+ * Finishing early keeps the session, but history / volume only reflect work done.
+ */
+export function pruneUnloggedExercises(exercises) {
+  const pruned = (exercises || [])
+    .map((ex) => {
+      const sets = (ex.sets || []).filter(isLoggedSet).map((set, idx) => ({
+        ...set,
+        set: idx + 1,
+      }));
+      return { ...ex, sets };
+    })
+    .filter((ex) => ex.sets.length > 0);
+  return normalizeSupersetAdjacency(pruned);
+}
+
+/**
  * @param {Array<{ name: string, sets: Array<unknown> }>} exercises
  */
-export function summarizeExercises(exercises) {
-  const list = exercises || [];
+export function summarizeExercises(exercises, options = {}) {
+  const list = options.loggedOnly ? pruneUnloggedExercises(exercises) : exercises || [];
   const exerciseCount = list.length;
   const setCount = list.reduce((n, ex) => n + (ex.sets?.length || 0), 0);
   const parts = [];

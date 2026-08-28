@@ -10,6 +10,7 @@ import {
   formatTime,
   createExercise,
   collectWorkoutData,
+  pruneUnloggedExercises,
   summarizeExercises,
   displayWorkoutName,
   formatRelativeDate,
@@ -713,7 +714,7 @@ function setWeightUnit(next) {
   renderPersonalRecords();
   if (!trackPhase.classList.contains("hidden")) renderSetsForm();
   if (!summaryPhase.classList.contains("hidden")) {
-    renderSummary(collectWorkoutData(selectedExercises, weightUnit));
+    renderSummary(pruneUnloggedExercises(collectWorkoutData(selectedExercises, weightUnit)));
   }
 }
 
@@ -1216,7 +1217,9 @@ function renderSavedWorkouts() {
 
     const date = document.createElement("div");
     date.className = "saved-item-date";
-    const stats = summarizeExercises(workout.routine || workout.exercises);
+    const stats = workout.kind === "template"
+      ? summarizeExercises(workout.exercises)
+      : summarizeExercises(workout.exercises, { loggedOnly: true });
     const when = workout.kind === "template"
       ? "Saved suggestion"
       : formatFullDate(workout.completedAt);
@@ -1740,13 +1743,9 @@ function applyRoutineUpdateChoice(shouldUpdate) {
 }
 
 function renderSummary(workoutData) {
-  const totalSets = workoutData.reduce((sum, ex) => sum + ex.sets.length, 0);
-  const loggedSets = workoutData.reduce(
-    (sum, ex) => sum + ex.sets.filter((s) => s.weight !== null || s.reps !== null).length,
-    0
-  );
+  const loggedSets = workoutData.reduce((sum, ex) => sum + ex.sets.length, 0);
 
-  summaryMeta.textContent = `${workoutData.length} exercise${workoutData.length !== 1 ? "s" : ""} · ${loggedSets} of ${totalSets} sets logged`;
+  summaryMeta.textContent = `${workoutData.length} exercise${workoutData.length !== 1 ? "s" : ""} · ${loggedSets} set${loggedSets !== 1 ? "s" : ""} logged`;
 
   summaryDetails.innerHTML = "";
 
@@ -1795,7 +1794,7 @@ function startWorkout() {
 function finishWorkout() {
   closeExercisePicker();
   stopRestTimer();
-  const data = collectWorkoutData(selectedExercises, weightUnit);
+  const data = pruneUnloggedExercises(collectWorkoutData(selectedExercises, weightUnit));
   const name = workoutNameInput.value.trim() || summaryNameInput.value.trim();
   savedWorkouts = saveCompletedWorkout(savedWorkouts, {
     name,
