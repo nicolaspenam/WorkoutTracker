@@ -64,6 +64,8 @@ export const EXERCISES = [
   { name: "Lat Pulldown", muscle: "back", equipment: ["cable"] },
   { name: "Straight-Arm Pulldown", muscle: "back", equipment: ["cable"] },
   { name: "Inverted Row", muscle: "back", equipment: ["bodyweight"] },
+  { name: "Towel Row", muscle: "back", equipment: ["bodyweight"] },
+  { name: "Superman", muscle: "back", equipment: ["bodyweight"] },
   { name: "Shrugs", muscle: "back", equipment: ["barbell", "dumbbell"] },
   { name: "Dumbbell Pullover", muscle: "back", equipment: ["dumbbell"] },
   { name: "Machine Row", muscle: "back", equipment: ["machine"] },
@@ -94,6 +96,7 @@ export const EXERCISES = [
   { name: "Cable Curl", muscle: "biceps", equipment: ["cable"] },
   { name: "Concentration Curl", muscle: "biceps", equipment: ["dumbbell"] },
   { name: "Machine Curl", muscle: "biceps", equipment: ["machine"] },
+  { name: "Towel Curl", muscle: "biceps", equipment: ["bodyweight"] },
 
   // Triceps
   { name: "Tricep Pushdown", muscle: "triceps", equipment: ["cable"] },
@@ -304,11 +307,11 @@ const ROLE_FALLBACKS = {
     "Dips",
     "Cable Fly",
   ],
-  hPull: ["Barbell Row", "Dumbbell Row", "Seated Cable Row", "Chest-Supported Row", "Machine Row", "Inverted Row"],
+  hPull: ["Barbell Row", "Dumbbell Row", "Seated Cable Row", "Chest-Supported Row", "Machine Row", "Inverted Row", "Towel Row"],
   vPush: ["Overhead Press", "Dumbbell Shoulder Press", "Arnold Press", "Shoulder Press Machine", "Cable Shoulder Press", "Pike Push-ups"],
-  vPull: ["Pull-ups", "Chin-ups", "Lat Pulldown", "Assisted Pull-up", "Dumbbell Pullover", "Machine Row", "T-Bar Row", "Inverted Row"],
+  vPull: ["Pull-ups", "Chin-ups", "Lat Pulldown", "Assisted Pull-up", "Dumbbell Pullover", "Machine Row", "T-Bar Row", "Inverted Row", "Towel Row", "Superman"],
   laterals: ["Lateral Raise", "Cable Lateral Raise", "Machine Lateral Raise", "Upright Row", "Rear Delt Fly", "Prone Y Raise"],
-  biceps: ["Dumbbell Curl", "Hammer Curl", "Barbell Curl", "Cable Curl", "Machine Curl", "Concentration Curl", "Chin-ups"],
+  biceps: ["Dumbbell Curl", "Hammer Curl", "Barbell Curl", "Cable Curl", "Machine Curl", "Concentration Curl", "Chin-ups", "Towel Curl"],
   triceps: [
     "Tricep Pushdown",
     "Rope Pushdown",
@@ -402,10 +405,19 @@ function catalogByName(exercises = EXERCISES) {
   return new Map((exercises || []).map((ex) => [ex.name, ex]));
 }
 
+function isBodyweightOnly(equipmentIds) {
+  return Array.isArray(equipmentIds) && equipmentIds.length === 1 && equipmentIds[0] === "bodyweight";
+}
+
+/** These are bodyweight *loading* but need a bar — skip them in bodyweight-only suggestions. */
+const NEEDS_PULLUP_BAR = new Set(["Pull-ups", "Chin-ups", "Hanging Leg Raise"]);
+
 function pickMatchingExercise(preferredNames, equipmentIds, usedNames, exercises, muscleId) {
+  const skipBar = isBodyweightOnly(equipmentIds);
   const byName = catalogByName(exercises);
   for (const name of preferredNames || []) {
     if (usedNames.has(name)) continue;
+    if (skipBar && NEEDS_PULLUP_BAR.has(name)) continue;
     const ex = byName.get(name);
     if (ex && exerciseMatchesEquipment(ex, equipmentIds)) return ex;
   }
@@ -415,6 +427,7 @@ function pickMatchingExercise(preferredNames, equipmentIds, usedNames, exercises
       (ex) =>
         ex.muscle === muscleId &&
         !usedNames.has(ex.name) &&
+        !(skipBar && NEEDS_PULLUP_BAR.has(ex.name)) &&
         exerciseMatchesEquipment(ex, equipmentIds)
     ) || null
   );

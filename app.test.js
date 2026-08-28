@@ -790,7 +790,7 @@ describe("suggested workouts", () => {
     },
     bodyweight: {
       fullBody: ["Bulgarian Split Squat", "Push-ups", "Single-Leg Romanian Deadlift", "Inverted Row", "Pike Push-ups", "Plank"],
-      upper: ["Push-ups", "Inverted Row", "Pike Push-ups", "Pull-ups", "Prone Y Raise", "Chin-ups", "Tricep Dips"],
+      upper: ["Push-ups", "Inverted Row", "Pike Push-ups", "Towel Row", "Prone Y Raise", "Towel Curl", "Tricep Dips"],
       lower: ["Bulgarian Split Squat", "Single-Leg Romanian Deadlift", "Walking Lunge", "Single-Leg Glute Bridge", "Nordic Curl", "Standing Calf Raise"],
     },
     barbell: {
@@ -847,6 +847,19 @@ describe("suggested workouts", () => {
       }
     });
   }
+
+  test("bodyweight-only suggestions do not assume a pull-up bar", () => {
+    const names = ["fullBody", "upper", "lower"].flatMap((kind) =>
+      namesOf(kind, ["bodyweight"])
+    );
+    for (const banned of ["Pull-ups", "Chin-ups", "Hanging Leg Raise"]) {
+      assert.ok(!names.includes(banned), `bodyweight suggestion should not include ${banned}`);
+    }
+    assert.ok(names.includes("Inverted Row"));
+    assert.ok(names.includes("Towel Row"));
+    const catalog = filterExercisesByEquipment(EXERCISES, ["bodyweight"]).map((ex) => ex.name);
+    assert.ok(catalog.includes("Pull-ups"), "pull-ups stay in the bodyweight list for people who have a bar");
+  });
 
   test("restricted filters never keep a barbell-only compound", () => {
     for (const id of ["dumbbell", "bodyweight", "machine", "cable"]) {
