@@ -1113,6 +1113,23 @@ body.is-block-dragging {
   font-size: 0.9rem;
 }
 
+.rpe-field {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.1rem;
+  min-width: 0;
+}
+
+.rpe-label {
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  text-align: center;
+}
+
 .rpe-input {
   min-width: 0;
   text-align: center;
