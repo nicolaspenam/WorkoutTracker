@@ -918,10 +918,64 @@ export function removeSet(exercise) {
  * empty live values, previous numbers attached from history).
  */
 export function workoutToExercises(savedWorkout, allWorkouts) {
-  const exercises = (savedWorkout?.exercises || []).map((ex) =>
+  const source = savedWorkout?.routine || savedWorkout?.exercises || [];
+  const exercises = source.map((ex) =>
     createExercise(ex.name, Math.max(1, ex.sets?.length || SETS_PER_EXERCISE), null)
   );
   return attachPreviousSets(exercises, allWorkouts);
+}
+
+export function exerciseStructure(exercises) {
+  return (exercises || []).map((ex) => ({
+    name: ex.name,
+    setCount: Math.max(1, ex.sets?.length || SETS_PER_EXERCISE),
+  }));
+}
+
+export function structuresEqual(a, b) {
+  if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) return false;
+  return a.every((item, i) => item?.name === b[i]?.name && item?.setCount === b[i]?.setCount);
+}
+
+export function toRoutineExercises(exercises) {
+  return exerciseStructure(exercises).map((item) => ({
+    name: item.name,
+    sets: Array.from({ length: item.setCount }, () => ({ weight: null, reps: null })),
+  }));
+}
+
+export function swapExerciseAt(exercises, index, newName, previousSets = null) {
+  const list = exercises || [];
+  if (index < 0 || index >= list.length || !newName) return list.slice();
+  if (list.some((ex, i) => i !== index && ex.name === newName)) return list.slice();
+  const setCount = Math.max(1, list[index].sets?.length || SETS_PER_EXERCISE);
+  const next = list.slice();
+  next[index] = createExercise(newName, setCount, previousSets);
+  return next;
+}
+
+/**
+ * Update the reusable routine for a saved workout.
+ * Templates change in place. History sessions keep logged sets and store a `routine`
+ * overlay so the next "Use workout" picks up the new exercises.
+ */
+export function updateSavedWorkoutRoutine(templates, workouts, source, exercises) {
+  const routine = toRoutineExercises(exercises);
+  if (!source?.id) return { templates: templates || [], workouts: workouts || [] };
+  if (source.kind === "template") {
+    return {
+      templates: (templates || []).map((item) =>
+        item.id === source.id ? { ...item, exercises: routine } : item
+      ),
+      workouts: workouts || [],
+    };
+  }
+  return {
+    templates: templates || [],
+    workouts: (workouts || []).map((item) =>
+      item.id === source.id ? { ...item, routine } : item
+    ),
+  };
 }
 
 function numericOrZero(value) {
@@ -1059,6 +1113,7 @@ export function normalizeWorkout(raw) {
     name: typeof raw.name === "string" && raw.name.trim() ? raw.name.trim() : null,
     completedAt: typeof raw.completedAt === "string" ? raw.completedAt : null,
     exercises: raw.exercises,
+    ...(Array.isArray(raw.routine) ? { routine: raw.routine } : {}),
   };
 }
 

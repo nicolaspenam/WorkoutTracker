@@ -12,6 +12,7 @@ A simple, mobile-friendly workout tracker built with vanilla HTML, CSS, and Java
 - **Suggested workouts** based on recent training: if you have not trained in about a week you get Full body, Upper, and Lower options; otherwise one session aimed at muscles that are due (hypertrophy targets of ~10–20 weekly sets, ~2×/week, ~48h recovery)
 - Optional name for each workout (e.g. “Push Day”)
 - Log weight and reps per set, with add/remove set controls
+- **Swap** an exercise in the middle of a session (or add one). If you started from a saved workout, Finish asks whether to update it for next time — history and PRs stay as logged
 - See last time’s weight/reps for each set and tap **✓** to copy them
 - Previous numbers stay in amber; values you type or confirm use a green style
 - Rest timer starts when a set is completed — pick **1:00 / 1:30 / 2:00**, and nudge **±15s** while it runs

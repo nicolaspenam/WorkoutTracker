@@ -29,6 +29,10 @@ import {
   addSet,
   removeSet,
   workoutToExercises,
+  exerciseStructure,
+  structuresEqual,
+  swapExerciseAt,
+  updateSavedWorkoutRoutine,
   isBetterSet,
   computePersonalRecords,
   queryPersonalRecords,
@@ -376,6 +380,74 @@ describe("workoutToExercises", () => {
     assert.equal(ex.sets[0].weight, "");
     assert.equal(ex.sets[0].previousWeight, 225);
     assert.equal(ex.sets[1].previousReps, 3);
+  });
+
+  test("prefers a saved routine overlay when reusing a history session", () => {
+    const saved = {
+      name: "Push Day",
+      exercises: [{ name: "Bench Press", sets: [{ weight: 185, reps: 5 }] }],
+      routine: [{ name: "Dumbbell Bench Press", sets: [{ weight: null, reps: null }, { weight: null, reps: null }] }],
+    };
+    const [ex] = workoutToExercises(saved, [saved]);
+    assert.equal(ex.name, "Dumbbell Bench Press");
+    assert.equal(ex.sets.length, 2);
+    assert.equal(ex.sets[0].previousWeight, null);
+  });
+});
+
+describe("swap / saved routine", () => {
+  test("swapExerciseAt replaces the name and keeps the set count", () => {
+    const current = [createExercise("Bench Press", 4)];
+    const next = swapExerciseAt(current, 0, "Dumbbell Bench Press");
+    assert.equal(next[0].name, "Dumbbell Bench Press");
+    assert.equal(next[0].sets.length, 4);
+    assert.equal(next[0].sets[0].weight, "");
+    assert.equal(current[0].name, "Bench Press");
+  });
+
+  test("swapExerciseAt refuses a duplicate name", () => {
+    const current = [createExercise("Bench Press"), createExercise("Squat")];
+    const next = swapExerciseAt(current, 0, "Squat");
+    assert.equal(next[0].name, "Bench Press");
+  });
+
+  test("structuresEqual detects name or set-count changes", () => {
+    const original = exerciseStructure([createExercise("Bench Press", 3)]);
+    assert.equal(structuresEqual(original, [{ name: "Bench Press", setCount: 3 }]), true);
+    assert.equal(structuresEqual(original, [{ name: "Dumbbell Bench Press", setCount: 3 }]), false);
+    assert.equal(structuresEqual(original, [{ name: "Bench Press", setCount: 4 }]), false);
+  });
+
+  test("updating a template replaces its exercises without touching history", () => {
+    const templates = [{ id: "t1", name: "Upper", exercises: [{ name: "Bench Press", sets: [{}, {}, {}] }] }];
+    const workouts = [{ id: "w1", name: "Upper", exercises: [{ name: "Bench Press", sets: [{ weight: 185, reps: 5 }] }] }];
+    const next = updateSavedWorkoutRoutine(
+      templates,
+      workouts,
+      { kind: "template", id: "t1" },
+      [createExercise("Dumbbell Bench Press", 3)]
+    );
+    assert.equal(next.templates[0].exercises[0].name, "Dumbbell Bench Press");
+    assert.equal(next.workouts[0].exercises[0].name, "Bench Press");
+    assert.equal(next.workouts[0].exercises[0].sets[0].weight, 185);
+  });
+
+  test("updating a history session stores a routine overlay and keeps logged sets", () => {
+    const workouts = [{
+      id: "w1",
+      name: "Push Day",
+      exercises: [{ name: "Bench Press", sets: [{ weight: 185, reps: 5 }] }],
+    }];
+    const next = updateSavedWorkoutRoutine(
+      [],
+      workouts,
+      { kind: "history", id: "w1" },
+      [createExercise("Dumbbell Bench Press", 3)]
+    );
+    assert.equal(next.workouts[0].exercises[0].name, "Bench Press");
+    assert.equal(next.workouts[0].exercises[0].sets[0].weight, 185);
+    assert.equal(next.workouts[0].routine[0].name, "Dumbbell Bench Press");
+    assert.equal(computePersonalRecords(next.workouts)["Bench Press"].weight, 185);
   });
 });
 

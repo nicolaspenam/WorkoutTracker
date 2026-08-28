@@ -23,6 +23,10 @@ import {
   addSet as addSetToExercise,
   removeSet as removeSetFromExercise,
   workoutToExercises,
+  exerciseStructure,
+  structuresEqual,
+  swapExerciseAt,
+  updateSavedWorkoutRoutine,
   computePersonalRecords,
   queryPersonalRecords,
   formatLoad,
@@ -62,6 +66,19 @@ const exerciseList = document.getElementById("exercise-list");
 const startWorkoutBtn = document.getElementById("start-workout-btn");
 const setsContainer = document.getElementById("sets-container");
 const finishWorkoutBtn = document.getElementById("finish-workout-btn");
+const trackAddExerciseBtn = document.getElementById("track-add-exercise-btn");
+const swapModal = document.getElementById("swap-modal");
+const swapTitle = document.getElementById("swap-title");
+const swapHelp = document.getElementById("swap-help");
+const swapMuscleFilters = document.getElementById("swap-muscle-filters");
+const swapSelect = document.getElementById("swap-select");
+const swapConfirmBtn = document.getElementById("swap-confirm-btn");
+const swapCancelBtn = document.getElementById("swap-cancel-btn");
+const updateRoutinePrompt = document.getElementById("update-routine-prompt");
+const updateRoutineText = document.getElementById("update-routine-text");
+const updateRoutineYes = document.getElementById("update-routine-yes");
+const updateRoutineNo = document.getElementById("update-routine-no");
+const updateRoutineStatus = document.getElementById("update-routine-status");
 const summaryMeta = document.getElementById("summary-meta");
 const summaryDetails = document.getElementById("summary-details");
 const newWorkoutBtn = document.getElementById("new-workout-btn");
@@ -106,6 +123,10 @@ let hiddenIds = [];
 let templates = [];
 let restSeconds = DEFAULT_REST_SECONDS;
 let equipmentIds = defaultEquipmentIds();
+let sourceLibrary = null;
+let swapIndex = null;
+let swapMuscleFilter = null;
+let pickerMode = "swap";
 
 function loadWorkouts() {
   try {
@@ -311,20 +332,21 @@ function stopRestTimer() {
   restTimerBar.classList.add("hidden");
 }
 
-function populateDropdown() {
-  const previousValue = exerciseSelect.value;
-  exerciseSelect.innerHTML = "";
+function fillExerciseSelect(selectEl, { muscleId = null, excludeNames = [] } = {}) {
+  const previousValue = selectEl.value;
+  selectEl.innerHTML = "";
 
   const placeholder = document.createElement("option");
   placeholder.value = "";
-  placeholder.textContent = muscleFilter
-    ? `Choose a ${(getMuscleLabel(muscleFilter) || "muscle").toLowerCase()} exercise…`
+  placeholder.textContent = muscleId
+    ? `Choose a ${(getMuscleLabel(muscleId) || "muscle").toLowerCase()} exercise…`
     : "Choose an exercise…";
-  exerciseSelect.appendChild(placeholder);
+  selectEl.appendChild(placeholder);
 
-  const filtered = filterCatalog(EXERCISES, muscleFilter, equipmentIds);
+  const excluded = new Set(excludeNames);
+  const filtered = filterCatalog(EXERCISES, muscleId, equipmentIds).filter((ex) => !excluded.has(ex.name));
 
-  if (muscleFilter) {
+  if (muscleId) {
     filtered
       .slice()
       .sort((a, b) => a.name.localeCompare(b.name))
@@ -332,7 +354,7 @@ function populateDropdown() {
         const option = document.createElement("option");
         option.value = ex.name;
         option.textContent = ex.name;
-        exerciseSelect.appendChild(option);
+        selectEl.appendChild(option);
       });
   } else {
     groupExercisesByMuscle(filtered).forEach((group) => {
@@ -344,13 +366,19 @@ function populateDropdown() {
         option.textContent = ex.name;
         optgroup.appendChild(option);
       });
-      exerciseSelect.appendChild(optgroup);
+      selectEl.appendChild(optgroup);
     });
   }
 
-  if ([...exerciseSelect.options].some((opt) => opt.value === previousValue)) {
-    exerciseSelect.value = previousValue;
+  if ([...selectEl.options].some((opt) => opt.value === previousValue)) {
+    selectEl.value = previousValue;
   }
+
+  return filtered.length;
+}
+
+function populateDropdown() {
+  fillExerciseSelect(exerciseSelect, { muscleId: muscleFilter });
 }
 
 function renderMuscleChips(container, selectedId, onSelect) {
@@ -444,6 +472,7 @@ function renderTimerRestPresets() {
 }
 
 function applySuggestion(suggestion) {
+  sourceLibrary = null;
   selectedExercises = exercisesFromSuggestion(suggestion, savedWorkouts);
   workoutNameInput.value = suggestion.name || "";
   renderExerciseList();
@@ -633,7 +662,7 @@ function renderSavedWorkouts() {
 
     const date = document.createElement("div");
     date.className = "saved-item-date";
-    const stats = summarizeExercises(workout.exercises);
+    const stats = summarizeExercises(workout.routine || workout.exercises);
     const when = workout.kind === "template"
       ? "Saved suggestion"
       : formatFullDate(workout.completedAt);
@@ -727,6 +756,12 @@ function renderPersonalRecords() {
 
 function useSavedWorkout(workout) {
   selectedExercises = workoutToExercises(workout, savedWorkouts);
+  sourceLibrary = {
+    kind: workout.kind === "template" ? "template" : "history",
+    id: workout.id,
+    name: displayWorkoutName(workout),
+    structure: exerciseStructure(workout.routine || workout.exercises),
+  };
   if (workout.name) {
     workoutNameInput.value = workout.name;
   }
@@ -805,8 +840,21 @@ function renderSetsForm() {
     setControls.appendChild(setBadge);
     setControls.appendChild(plusBtn);
 
+    const actions = document.createElement("div");
+    actions.className = "exercise-header-actions";
+
+    const swapBtn = document.createElement("button");
+    swapBtn.type = "button";
+    swapBtn.className = "btn-swap";
+    swapBtn.textContent = "Swap";
+    swapBtn.setAttribute("aria-label", `Swap ${item.name}`);
+    swapBtn.addEventListener("click", () => openExercisePicker("swap", exerciseIndex));
+
+    actions.appendChild(swapBtn);
+    actions.appendChild(setControls);
+
     header.appendChild(titleWrap);
-    header.appendChild(setControls);
+    header.appendChild(actions);
     block.appendChild(header);
 
     const tableHeader = document.createElement("div");
@@ -921,6 +969,104 @@ function syncAutofillButton(btn, setData, exerciseName, setNum) {
   btn.setAttribute("aria-label", label);
 }
 
+function pickerExcludeNames() {
+  return selectedExercises.map((ex) => ex.name);
+}
+
+function refreshPickerSelect() {
+  const count = fillExerciseSelect(swapSelect, {
+    muscleId: swapMuscleFilter,
+    excludeNames: pickerExcludeNames(),
+  });
+  swapConfirmBtn.disabled = !swapSelect.value;
+  if (count === 0) {
+    swapHelp.textContent = "No other exercises match that filter. Try All or a different muscle.";
+    return;
+  }
+  const current = swapIndex != null ? selectedExercises[swapIndex] : null;
+  swapHelp.textContent = pickerMode === "add"
+    ? "Added to the end of this session. Equipment filters still apply."
+    : `Replace ${current?.name || "this exercise"}. Logged sets for it will be cleared.`;
+}
+
+function setSwapMuscleFilter(muscleId) {
+  swapMuscleFilter = muscleId;
+  renderMuscleChips(swapMuscleFilters, swapMuscleFilter, setSwapMuscleFilter);
+  refreshPickerSelect();
+}
+
+function openExercisePicker(mode, index = null) {
+  pickerMode = mode;
+  swapIndex = index;
+  const current = index != null ? selectedExercises[index] : null;
+  swapMuscleFilter = current ? getMuscleForExercise(current.name) : null;
+  swapTitle.textContent = mode === "add" ? "Add exercise" : "Swap exercise";
+  swapConfirmBtn.textContent = mode === "add" ? "Add" : "Swap";
+  swapHelp.textContent = mode === "add"
+    ? "Added to the end of this session. Equipment filters still apply."
+    : `Replace ${current?.name || "this exercise"}. Logged sets for it will be cleared.`;
+  renderMuscleChips(swapMuscleFilters, swapMuscleFilter, setSwapMuscleFilter);
+  refreshPickerSelect();
+  swapModal.classList.remove("hidden");
+  swapSelect.focus();
+}
+
+function closeExercisePicker() {
+  swapModal.classList.add("hidden");
+  swapIndex = null;
+}
+
+function confirmExercisePicker() {
+  const name = swapSelect.value;
+  if (!name) return;
+  if (pickerMode === "add") {
+    selectedExercises.push(createExercise(name, SETS_PER_EXERCISE, getPreviousSets(savedWorkouts, name)));
+  } else if (swapIndex != null) {
+    selectedExercises = swapExerciseAt(
+      selectedExercises,
+      swapIndex,
+      name,
+      getPreviousSets(savedWorkouts, name)
+    );
+  }
+  closeExercisePicker();
+  renderSetsForm();
+}
+
+function renderUpdatePrompt() {
+  updateRoutineStatus.textContent = "";
+  updateRoutineStatus.classList.remove("success");
+  const changed = sourceLibrary && !structuresEqual(sourceLibrary.structure, exerciseStructure(selectedExercises));
+  updateRoutinePrompt.classList.toggle("hidden", !changed);
+  if (!changed) return;
+  updateRoutineYes.disabled = false;
+  updateRoutineNo.disabled = false;
+  updateRoutineText.textContent =
+    `You changed “${sourceLibrary.name}”. Update the saved workout for next time? Today's session and past PRs stay as logged.`;
+}
+
+function applyRoutineUpdateChoice(shouldUpdate) {
+  if (!sourceLibrary) {
+    updateRoutinePrompt.classList.add("hidden");
+    return;
+  }
+  if (shouldUpdate) {
+    const next = updateSavedWorkoutRoutine(templates, savedWorkouts, sourceLibrary, selectedExercises);
+    templates = next.templates;
+    savedWorkouts = next.workouts;
+    persistWorkouts();
+    renderSavedWorkouts();
+    updateRoutineStatus.textContent = `Updated “${sourceLibrary.name}” for next time.`;
+    updateRoutineStatus.classList.add("success");
+  } else {
+    updateRoutineStatus.textContent = "Kept the original saved workout.";
+    updateRoutineStatus.classList.remove("success");
+  }
+  updateRoutineYes.disabled = true;
+  updateRoutineNo.disabled = true;
+  sourceLibrary = null;
+}
+
 function renderSummary(workoutData) {
   const totalSets = workoutData.reduce((sum, ex) => sum + ex.sets.length, 0);
   const loggedSets = workoutData.reduce(
@@ -960,6 +1106,7 @@ function startWorkout() {
 }
 
 function finishWorkout() {
+  closeExercisePicker();
   stopRestTimer();
   const data = collectWorkoutData(selectedExercises);
   const name = workoutNameInput.value.trim() || summaryNameInput.value.trim();
@@ -975,6 +1122,7 @@ function finishWorkout() {
   renderPersonalRecords();
   renderSuggestions();
   showPhase("summary");
+  renderUpdatePrompt();
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
@@ -982,8 +1130,11 @@ function resetWorkout() {
   stopRestTimer();
   selectedExercises = [];
   savedWorkoutId = null;
+  sourceLibrary = null;
+  closeExercisePicker();
   workoutNameInput.value = "";
   summaryNameInput.value = "";
+  updateRoutinePrompt.classList.add("hidden");
   renderExerciseList();
   setActiveTab("workout");
   showPhase("build");
@@ -997,6 +1148,22 @@ function bindEvents() {
   });
   startWorkoutBtn.addEventListener("click", startWorkout);
   finishWorkoutBtn.addEventListener("click", finishWorkout);
+  trackAddExerciseBtn.addEventListener("click", () => openExercisePicker("add"));
+  swapConfirmBtn.addEventListener("click", confirmExercisePicker);
+  swapCancelBtn.addEventListener("click", closeExercisePicker);
+  swapSelect.addEventListener("change", () => {
+    swapConfirmBtn.disabled = !swapSelect.value;
+  });
+  swapModal.addEventListener("click", (e) => {
+    if (e.target === swapModal) closeExercisePicker();
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && !swapModal.classList.contains("hidden")) {
+      closeExercisePicker();
+    }
+  });
+  updateRoutineYes.addEventListener("click", () => applyRoutineUpdateChoice(true));
+  updateRoutineNo.addEventListener("click", () => applyRoutineUpdateChoice(false));
   newWorkoutBtn.addEventListener("click", resetWorkout);
   dismissTimerBtn.addEventListener("click", stopRestTimer);
   timerMinusBtn.addEventListener("click", () => nudgeTimer(-TIMER_ADJUST_SECONDS));
