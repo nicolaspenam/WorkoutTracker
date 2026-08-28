@@ -203,6 +203,29 @@ body {
   flex-shrink: 0;
 }
 
+.volume-list {
+  list-style: none;
+  margin: 0.55rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.volume-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.75rem;
+  font-size: 0.92rem;
+}
+
+.volume-sets {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+
 .superset-badge {
   font-size: 0.72rem;
   font-weight: 750;
@@ -418,6 +441,7 @@ body.is-block-dragging {
 .timer-info {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 0.5rem;
   font-weight: 600;
   font-size: 0.9rem;
@@ -433,6 +457,17 @@ body.is-block-dragging {
   font-weight: 700;
   color: var(--accent);
   letter-spacing: 0.05em;
+}
+
+.timer-end-hint {
+  font-size: 0.75rem;
+  font-weight: 650;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.timer-end-hint:empty {
+  display: none;
 }
 
 .rest-timer-bar.finished .timer-countdown {
@@ -1071,6 +1106,61 @@ body.is-block-dragging {
 
 .prev-hint.empty {
   color: transparent;
+}
+
+.exercise-note {
+  margin: 0.45rem 0 0.65rem;
+  font-size: 0.9rem;
+}
+
+.rpe-field {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.1rem;
+  min-width: 0;
+}
+
+.rpe-label {
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.rpe-input {
+  min-width: 0;
+  text-align: center;
+  font-size: 0.78rem;
+  padding: 0.2rem 0.15rem;
+  min-height: 1.85rem;
+}
+
+.try-next {
+  display: inline-flex;
+  align-items: center;
+  margin: 0.2rem 0 0.15rem 2.4rem;
+  padding: 0.22rem 0.6rem;
+  border-radius: 999px;
+  border: 1px solid var(--accent);
+  background: transparent;
+  color: var(--accent);
+  font-size: 0.75rem;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.try-next[hidden] {
+  display: none;
+}
+
+.summary-note {
+  margin: 0.15rem 0 0.35rem;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  font-style: italic;
 }
 
 .set-number {

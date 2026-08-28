@@ -10,6 +10,7 @@ import {
   formatTime,
   createExercise,
   collectWorkoutData,
+  pruneUnloggedExercises,
   summarizeExercises,
   displayWorkoutName,
   formatRelativeDate,
@@ -65,6 +66,16 @@ import {
   hideWorkoutFromLibrary,
   saveSuggestionTemplate,
   removeTemplate,
+  normalizeWeightUnit,
+  unitLabel,
+  displayWeightFromLb,
+  convertLiveExerciseWeights,
+  suggestProgression,
+  formatProgressionHint,
+  weeklyVolumeRows,
+  remainingSeconds,
+  restEndClockLabel,
+  restStartNotificationPayload,
 } from "./logic.js";
 import { getExerciseGuide } from "./guides.js";
 
@@ -119,7 +130,9 @@ const muscleFilters = document.getElementById("muscle-filters");
 const prMuscleFilters = document.getElementById("pr-muscle-filters");
 const equipmentFilters = document.getElementById("equipment-filters");
 const restPresets = document.getElementById("rest-presets");
+const unitPresets = document.getElementById("unit-presets");
 const timerRestPresets = document.getElementById("timer-rest-presets");
+const timerEndHint = document.getElementById("timer-end-hint");
 const notifyRestToggle = document.getElementById("notify-rest-toggle");
 const suggestionList = document.getElementById("suggestion-list");
 const suggestHelp = document.getElementById("suggest-help");
@@ -144,7 +157,10 @@ let templates = [];
 let restSeconds = DEFAULT_REST_SECONDS;
 let equipmentIds = defaultEquipmentIds();
 let notifyRest = true;
+let weightUnit = "lb";
+let restEndsAt = null;
 let restNotifyContext = null;
+let restDoneNotified = false;
 let wakeLock = null;
 let sourceLibrary = null;
 let swapIndex = null;
@@ -161,6 +177,7 @@ function loadWorkouts() {
     restSeconds = settings.restSeconds;
     equipmentIds = settings.equipmentIds;
     notifyRest = settings.notifyRest !== false;
+    weightUnit = normalizeWeightUnit(settings.weightUnit);
     return state.workouts;
   } catch {
     hiddenIds = [];
@@ -168,6 +185,7 @@ function loadWorkouts() {
     restSeconds = DEFAULT_REST_SECONDS;
     equipmentIds = defaultEquipmentIds();
     notifyRest = true;
+    weightUnit = "lb";
     return [];
   }
 }
@@ -180,7 +198,7 @@ function persistWorkouts() {
         workouts: savedWorkouts,
         hiddenIds,
         templates,
-        settings: { restSeconds, equipmentIds, notifyRest },
+        settings: { restSeconds, equipmentIds, notifyRest, weightUnit },
       })
     );
   } catch {
@@ -209,6 +227,7 @@ function applyImportedWorkouts(workouts, mode, extra = {}) {
       restSeconds = extra.settings.restSeconds;
       equipmentIds = extra.settings.equipmentIds;
       notifyRest = extra.settings.notifyRest !== false;
+      weightUnit = normalizeWeightUnit(extra.settings.weightUnit);
     }
     setBackupStatus(`Replaced history with ${workouts.length} workout${workouts.length !== 1 ? "s" : ""}.`, "success");
   } else {
@@ -232,8 +251,10 @@ function applyImportedWorkouts(workouts, mode, extra = {}) {
   renderPersonalRecords();
   renderEquipmentChips();
   renderRestPresets();
+  renderUnitPresets();
   renderNotifyToggle();
   renderSuggestions();
+  renderWeeklyVolume();
   hideImportConfirm();
 }
 
@@ -357,22 +378,33 @@ function releaseWakeLock() {
   wakeLock = null;
 }
 
-function restNotificationOptions(payload) {
+function loadText(weight, reps) {
+  return formatLoad(weight, reps, weightUnit);
+}
+
+function setLine(set) {
+  const load = loadText(set.weight, set.reps);
+  return set.rpe != null ? `Set ${set.set}: ${load} · effort ${set.rpe}` : `Set ${set.set}: ${load}`;
+}
+
+function restNotificationOptions(payload, extra = {}) {
+  const silent = extra.silent ?? payload.silent ?? false;
   return {
     body: payload.body,
     icon: "./icons/icon-192.png",
     badge: "./icons/icon-192.png",
     tag: "rest-timer",
-    renotify: true,
-    vibrate: [180, 80, 180],
+    renotify: extra.renotify ?? !silent,
+    silent,
+    vibrate: silent ? [] : [180, 80, 180],
     data: { url: "./" },
   };
 }
 
-async function showRestNotification(payload) {
+async function showRestNotification(payload, extra = {}) {
   if (!notifyRest || !("Notification" in window)) return;
   if (Notification.permission !== "granted") return;
-  const options = restNotificationOptions(payload);
+  const options = restNotificationOptions(payload, extra);
   try {
     const reg = await navigator.serviceWorker?.ready;
     if (reg?.showNotification) {
@@ -380,7 +412,12 @@ async function showRestNotification(payload) {
       return;
     }
     if (reg?.active) {
-      reg.active.postMessage({ type: "REST_DONE", title: payload.title, body: payload.body });
+      reg.active.postMessage({
+        type: extra.silent || payload.silent ? "REST_START" : "REST_DONE",
+        title: payload.title,
+        body: payload.body,
+        silent: !!(extra.silent || payload.silent),
+      });
       return;
     }
   } catch {
@@ -393,8 +430,19 @@ async function showRestNotification(payload) {
   }
 }
 
+async function closeRestNotification() {
+  try {
+    const reg = await navigator.serviceWorker?.ready;
+    const notes = await reg?.getNotifications?.({ tag: "rest-timer" });
+    notes?.forEach((note) => note.close());
+  } catch {
+    // Ignore.
+  }
+}
+
 function fireRestNotification() {
-  if (!notifyRest) return;
+  if (!notifyRest || restDoneNotified) return;
+  restDoneNotified = true;
   try {
     navigator.vibrate?.([180, 80, 180]);
   } catch {
@@ -407,7 +455,22 @@ function fireRestNotification() {
         restNotifyContext.setIndex
       )
     : { title: "Rest over", body: "Time for your next set." };
-  showRestNotification(payload);
+  showRestNotification(payload, { silent: false, renotify: true });
+}
+
+function showRestStartNotification(endsAt) {
+  if (!notifyRest) return;
+  showRestNotification(restStartNotificationPayload(endsAt), { silent: true, renotify: false });
+}
+
+function updateTimerEndHint(endsAt) {
+  if (!timerEndHint) return;
+  if (!endsAt) {
+    timerEndHint.textContent = "";
+    return;
+  }
+  const clock = restEndClockLabel(endsAt);
+  timerEndHint.textContent = clock ? `Up at ${clock}` : "";
 }
 
 function maybeStartRest(exerciseIndex, setIndex, justCompleted) {
@@ -417,49 +480,58 @@ function maybeStartRest(exerciseIndex, setIndex, justCompleted) {
   startRestTimer(restSeconds);
 }
 
+function tickRestTimer() {
+  const left = remainingSeconds(restEndsAt);
+  timerSecondsLeft = left;
+  timerDisplay.textContent = formatTime(left);
+  if (left <= 0) {
+    if (timerInterval) {
+      clearInterval(timerInterval);
+      timerInterval = null;
+    }
+    restEndsAt = null;
+    restTimerBar.classList.add("finished");
+    updateTimerEndHint(null);
+    releaseWakeLock();
+    fireRestNotification();
+    return true;
+  }
+  return false;
+}
+
 function startRestTimer(duration = restSeconds) {
   if (timerInterval) {
     clearInterval(timerInterval);
   }
 
-  timerSecondsLeft = Math.max(0, duration);
-  timerDisplay.textContent = formatTime(timerSecondsLeft);
+  const seconds = Math.max(0, duration);
+  restEndsAt = Date.now() + seconds * 1000;
+  restDoneNotified = false;
+  timerSecondsLeft = seconds;
+  timerDisplay.textContent = formatTime(seconds);
   restTimerBar.classList.remove("hidden");
   restTimerBar.classList.remove("finished");
+  updateTimerEndHint(restEndsAt);
   renderTimerRestPresets();
   holdWakeLock();
+  showRestStartNotification(restEndsAt);
 
-  if (timerSecondsLeft <= 0) {
-    timerInterval = null;
-    restTimerBar.classList.add("finished");
-    releaseWakeLock();
-    fireRestNotification();
-    return;
-  }
+  if (tickRestTimer()) return;
 
-  timerInterval = setInterval(() => {
-    timerSecondsLeft--;
+  timerInterval = setInterval(tickRestTimer, 1000);
+}
 
-    if (timerSecondsLeft <= 0) {
-      clearInterval(timerInterval);
-      timerInterval = null;
-      timerSecondsLeft = 0;
-      timerDisplay.textContent = "0:00";
-      restTimerBar.classList.add("finished");
-      releaseWakeLock();
-      fireRestNotification();
-    } else {
-      timerDisplay.textContent = formatTime(timerSecondsLeft);
-    }
-  }, 1000);
+function catchUpRestTimer() {
+  if (restTimerBar.classList.contains("hidden") || !restEndsAt) return;
+  if (tickRestTimer()) return;
+  holdWakeLock();
 }
 
 function nudgeTimer(delta) {
   const current = restTimerBar.classList.contains("hidden")
     ? restSeconds
-    : timerSecondsLeft;
-  const next = adjustTimerSeconds(current, delta);
-  startRestTimer(next);
+    : remainingSeconds(restEndsAt || Date.now() + timerSecondsLeft * 1000);
+  startRestTimer(adjustTimerSeconds(current, delta));
 }
 
 function stopRestTimer() {
@@ -467,9 +539,13 @@ function stopRestTimer() {
     clearInterval(timerInterval);
     timerInterval = null;
   }
+  restEndsAt = null;
+  restDoneNotified = false;
   restTimerBar.classList.add("hidden");
   restTimerBar.classList.remove("finished");
+  updateTimerEndHint(null);
   releaseWakeLock();
+  closeRestNotification();
 }
 
 function fillExerciseSelect(selectEl, { muscleId = null, excludeNames = [] } = {}) {
@@ -609,6 +685,37 @@ function renderRestPresets() {
 
 function renderTimerRestPresets() {
   if (timerRestPresets) renderRestPresetButtons(timerRestPresets);
+}
+
+function renderUnitPresets() {
+  if (!unitPresets) return;
+  unitPresets.innerHTML = "";
+  [
+    { id: "lb", label: "lb" },
+    { id: "kg", label: "kg" },
+  ].forEach((unit) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "rest-chip" + (weightUnit === unit.id ? " active" : "");
+    btn.textContent = unit.label;
+    btn.setAttribute("aria-pressed", weightUnit === unit.id ? "true" : "false");
+    btn.addEventListener("click", () => setWeightUnit(unit.id));
+    unitPresets.appendChild(btn);
+  });
+}
+
+function setWeightUnit(next) {
+  const unit = normalizeWeightUnit(next);
+  if (unit === weightUnit) return;
+  selectedExercises = convertLiveExerciseWeights(selectedExercises, weightUnit, unit);
+  weightUnit = unit;
+  persistWorkouts();
+  renderUnitPresets();
+  renderPersonalRecords();
+  if (!trackPhase.classList.contains("hidden")) renderSetsForm();
+  if (!summaryPhase.classList.contains("hidden")) {
+    renderSummary(pruneUnloggedExercises(collectWorkoutData(selectedExercises, weightUnit)));
+  }
 }
 
 function applySuggestion(suggestion) {
@@ -1110,7 +1217,9 @@ function renderSavedWorkouts() {
 
     const date = document.createElement("div");
     date.className = "saved-item-date";
-    const stats = summarizeExercises(workout.routine || workout.exercises);
+    const stats = workout.kind === "template"
+      ? summarizeExercises(workout.exercises)
+      : summarizeExercises(workout.exercises, { loggedOnly: true });
     const when = workout.kind === "template"
       ? "Saved suggestion"
       : formatFullDate(workout.completedAt);
@@ -1192,7 +1301,7 @@ function renderPersonalRecords() {
 
     const load = document.createElement("div");
     load.className = "pr-load";
-    load.textContent = formatLoad(pr.weight, pr.reps);
+    load.textContent = loadText(pr.weight, pr.reps);
 
     li.appendChild(left);
     li.appendChild(load);
@@ -1241,7 +1350,7 @@ function renderExerciseBlock(item, exerciseIndex, prs) {
   if (pr) {
     const prLine = document.createElement("div");
     prLine.className = "exercise-pr";
-    prLine.textContent = `PR ${formatLoad(pr.weight, pr.reps)}`;
+    prLine.textContent = `PR ${loadText(pr.weight, pr.reps)}`;
     titleWrap.appendChild(prLine);
   }
 
@@ -1290,6 +1399,18 @@ function renderExerciseBlock(item, exerciseIndex, prs) {
   header.appendChild(actions);
   block.appendChild(header);
 
+  const noteInput = document.createElement("input");
+  noteInput.type = "text";
+  noteInput.className = "input exercise-note";
+  noteInput.placeholder = "Note (optional)";
+  noteInput.value = item.note || "";
+  noteInput.autocomplete = "off";
+  noteInput.setAttribute("aria-label", `${item.name} note`);
+  noteInput.addEventListener("input", (e) => {
+    selectedExercises[exerciseIndex].note = e.target.value;
+  });
+  block.appendChild(noteInput);
+
   const tableHeader = document.createElement("div");
   tableHeader.className = "sets-header";
   tableHeader.innerHTML = "<span>Set</span><span>Weight</span><span>Reps</span><span></span>";
@@ -1310,7 +1431,7 @@ function renderExerciseBlock(item, exerciseIndex, prs) {
     const weightInput = document.createElement("input");
     weightInput.type = "number";
     weightInput.className = inputClassFor(setData, "weight");
-    weightInput.placeholder = "lbs";
+    weightInput.placeholder = unitLabel(weightUnit);
     weightInput.min = "0";
     weightInput.step = "2.5";
     weightInput.value = setData.weight;
@@ -1333,10 +1454,15 @@ function renderExerciseBlock(item, exerciseIndex, prs) {
     autoBtn.textContent = "✓";
     syncAutofillButton(autoBtn, setData, item.name, setNum);
 
+    const tryBtn = document.createElement("button");
+    tryBtn.type = "button";
+    tryBtn.className = "try-next";
+
     const refreshSetUi = () => {
       weightInput.className = inputClassFor(setData, "weight");
       repsInput.className = inputClassFor(setData, "reps");
       syncAutofillButton(autoBtn, setData, item.name, setNum);
+      syncProgressionButton(tryBtn, setData);
     };
 
     weightInput.addEventListener("input", (e) => {
@@ -1352,12 +1478,17 @@ function renderExerciseBlock(item, exerciseIndex, prs) {
     });
 
     autoBtn.addEventListener("click", () => {
-      const justCompleted = applyPreviousSet(setData);
+      const justCompleted = applyPreviousSet(setData, weightUnit);
       weightInput.value = setData.weight;
       repsInput.value = setData.reps;
       refreshSetUi();
       maybeStartRest(exerciseIndex, setIdx, justCompleted);
     });
+
+    tryBtn.addEventListener("click", () => {
+      applyProgressionHint(exerciseIndex, setIdx);
+    });
+    syncProgressionButton(tryBtn, setData);
 
     row.appendChild(setLabel);
     row.appendChild(weightInput);
@@ -1370,21 +1501,41 @@ function renderExerciseBlock(item, exerciseIndex, prs) {
     const prevWeight = document.createElement("span");
     prevWeight.className = hasPreviousSet(setData) ? "prev-hint" : "prev-hint empty";
     prevWeight.textContent = hasPreviousSet(setData)
-      ? `prev ${setData.previousWeight ?? "—"}`
+      ? `prev ${displayWeightFromLb(setData.previousWeight, weightUnit) || "—"}`
       : "";
     const prevReps = document.createElement("span");
     prevReps.className = hasPreviousSet(setData) ? "prev-hint" : "prev-hint empty";
     prevReps.textContent = hasPreviousSet(setData)
       ? `prev ${setData.previousReps ?? "—"}`
       : "";
-    const prevSpacer = document.createElement("span");
+    const rpeInput = document.createElement("input");
+    rpeInput.type = "number";
+    rpeInput.className = "input rpe-input";
+    rpeInput.min = "1";
+    rpeInput.max = "10";
+    rpeInput.step = "0.5";
+    rpeInput.inputMode = "decimal";
+    rpeInput.placeholder = setData.previousRpe != null ? String(setData.previousRpe) : "1–10";
+    rpeInput.value = setData.rpe || "";
+    rpeInput.setAttribute("aria-label", `${item.name} set ${setNum} effort, 1 easy to 10 max`);
+    rpeInput.addEventListener("input", (e) => {
+      updateSetField(setData, "rpe", e.target.value);
+    });
+    const rpeWrap = document.createElement("label");
+    rpeWrap.className = "rpe-field";
+    const rpeCaption = document.createElement("span");
+    rpeCaption.className = "rpe-label";
+    rpeCaption.textContent = "Effort";
+    rpeWrap.appendChild(rpeCaption);
+    rpeWrap.appendChild(rpeInput);
     prevRow.appendChild(spacer);
     prevRow.appendChild(prevWeight);
     prevRow.appendChild(prevReps);
-    prevRow.appendChild(prevSpacer);
+    prevRow.appendChild(rpeWrap);
 
     group.appendChild(row);
     group.appendChild(prevRow);
+    group.appendChild(tryBtn);
     block.appendChild(group);
   });
 
@@ -1401,6 +1552,11 @@ function renderSetsForm() {
     <span><span class="legend-swatch typed"></span>Typed / confirmed</span>
   `;
   setsContainer.appendChild(legend);
+
+  const effortHelp = document.createElement("p");
+  effortHelp.className = "legend rest-superset-note";
+  effortHelp.textContent = "Effort is optional (1 easy – 10 could not do another rep). It does not start rest.";
+  setsContainer.appendChild(effortHelp);
 
   const note = document.createElement("p");
   note.className = "legend rest-superset-note";
@@ -1435,9 +1591,57 @@ function syncAutofillButton(btn, setData, exerciseName, setNum) {
   btn.disabled = !available;
   btn.classList.toggle("applied", setData.source === "previous");
   const label = available
-    ? `Use previous ${formatLoad(setData.previousWeight, setData.previousReps)} for ${exerciseName || "exercise"} set ${setNum || ""}`.trim()
+    ? `Use previous ${loadText(setData.previousWeight, setData.previousReps)} for ${exerciseName || "exercise"} set ${setNum || ""}`.trim()
     : "No previous set to copy";
   btn.setAttribute("aria-label", label);
+}
+
+function syncProgressionButton(btn, setData) {
+  const empty = !setData.weight && !setData.reps;
+  const suggestion = empty
+    ? suggestProgression(setData.previousWeight, setData.previousReps, weightUnit)
+    : null;
+  const label = formatProgressionHint(suggestion, weightUnit);
+  btn.hidden = !label;
+  btn.textContent = label;
+  btn.setAttribute("aria-label", label || "No progression suggestion");
+}
+
+function applyProgressionHint(exerciseIndex, setIndex) {
+  const setData = selectedExercises[exerciseIndex]?.sets?.[setIndex];
+  if (!setData) return;
+  const suggestion = suggestProgression(setData.previousWeight, setData.previousReps, weightUnit);
+  if (!suggestion) return;
+  updateSetField(setData, "weight", displayWeightFromLb(suggestion.weightLb, weightUnit));
+  const justCompleted = updateSetField(setData, "reps", String(suggestion.reps));
+  maybeStartRest(exerciseIndex, setIndex, justCompleted);
+  renderSetsForm();
+}
+
+function renderWeeklyVolume() {
+  const rows = weeklyVolumeRows(savedWorkouts);
+  document.querySelectorAll("[data-volume-list]").forEach((list) => {
+    list.innerHTML = "";
+    if (rows.length === 0) {
+      const li = document.createElement("li");
+      li.className = "empty-state";
+      li.textContent = "No sets logged in the last 7 days.";
+      list.appendChild(li);
+      return;
+    }
+    rows.forEach((row) => {
+      const li = document.createElement("li");
+      li.className = "volume-row";
+      const name = document.createElement("span");
+      name.textContent = row.label;
+      const sets = document.createElement("span");
+      sets.className = "volume-sets";
+      sets.textContent = `${row.sets} set${row.sets !== 1 ? "s" : ""}`;
+      li.appendChild(name);
+      li.appendChild(sets);
+      list.appendChild(li);
+    });
+  });
 }
 
 function pickerExcludeNames() {
@@ -1539,13 +1743,9 @@ function applyRoutineUpdateChoice(shouldUpdate) {
 }
 
 function renderSummary(workoutData) {
-  const totalSets = workoutData.reduce((sum, ex) => sum + ex.sets.length, 0);
-  const loggedSets = workoutData.reduce(
-    (sum, ex) => sum + ex.sets.filter((s) => s.weight !== null || s.reps !== null).length,
-    0
-  );
+  const loggedSets = workoutData.reduce((sum, ex) => sum + ex.sets.length, 0);
 
-  summaryMeta.textContent = `${workoutData.length} exercise${workoutData.length !== 1 ? "s" : ""} · ${loggedSets} of ${totalSets} sets logged`;
+  summaryMeta.textContent = `${workoutData.length} exercise${workoutData.length !== 1 ? "s" : ""} · ${loggedSets} set${loggedSets !== 1 ? "s" : ""} logged`;
 
   summaryDetails.innerHTML = "";
 
@@ -1564,10 +1764,16 @@ function renderSummary(workoutData) {
       const heading = document.createElement("h4");
       heading.appendChild(exerciseNameButton(exercise.name, { heading: true }));
       div.appendChild(heading);
+      if (exercise.note) {
+        const note = document.createElement("p");
+        note.className = "summary-note";
+        note.textContent = exercise.note;
+        div.appendChild(note);
+      }
       exercise.sets.forEach((set) => {
         const p = document.createElement("p");
         p.className = "summary-set";
-        p.textContent = `Set ${set.set}: ${formatLoad(set.weight, set.reps)}`;
+        p.textContent = setLine(set);
         div.appendChild(p);
       });
       wrap.appendChild(div);
@@ -1588,7 +1794,7 @@ function startWorkout() {
 function finishWorkout() {
   closeExercisePicker();
   stopRestTimer();
-  const data = collectWorkoutData(selectedExercises);
+  const data = pruneUnloggedExercises(collectWorkoutData(selectedExercises, weightUnit));
   const name = workoutNameInput.value.trim() || summaryNameInput.value.trim();
   savedWorkouts = saveCompletedWorkout(savedWorkouts, {
     name,
@@ -1601,6 +1807,7 @@ function finishWorkout() {
   renderSavedWorkouts();
   renderPersonalRecords();
   renderSuggestions();
+  renderWeeklyVolume();
   showPhase("summary");
   renderUpdatePrompt();
   window.scrollTo({ top: 0, behavior: "smooth" });
@@ -1659,8 +1866,11 @@ function bindEvents() {
   timerMinusBtn.addEventListener("click", () => nudgeTimer(-TIMER_ADJUST_SECONDS));
   timerPlusBtn.addEventListener("click", () => nudgeTimer(TIMER_ADJUST_SECONDS));
   document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "visible" && timerInterval) holdWakeLock();
+    if (document.visibilityState !== "visible") return;
+    catchUpRestTimer();
   });
+  window.addEventListener("focus", catchUpRestTimer);
+  window.addEventListener("pageshow", catchUpRestTimer);
 
   workoutNameInput.addEventListener("input", () => {
     summaryNameInput.value = workoutNameInput.value;
@@ -1709,12 +1919,14 @@ renderMuscleChips(muscleFilters, muscleFilter, setMuscleFilter);
 renderMuscleChips(prMuscleFilters, prMuscleFilter, setPrMuscleFilter);
 renderEquipmentChips();
 renderRestPresets();
+renderUnitPresets();
 renderNotifyToggle();
 populateDropdown();
 renderExerciseList();
 renderSuggestions();
 renderSavedWorkouts();
 renderPersonalRecords();
+renderWeeklyVolume();
 bindEvents();
 
 if ("serviceWorker" in navigator) {
