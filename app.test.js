@@ -701,7 +701,7 @@ describe("suggested workouts", () => {
   test("with no recent sessions offers full / upper / lower templates", () => {
     const suggestions = suggestWorkouts([], { now: new Date("2026-08-24T12:00:00Z") });
     assert.deepEqual(suggestions.map((s) => s.kind), ["fullBody", "upper", "lower"]);
-    assert.ok(suggestions.every((s) => s.exercises.length >= 4));
+    assert.ok(suggestions.every((s) => s.exercises.length >= 6));
   });
 
   test("templates respect equipment filters", () => {
@@ -715,6 +715,36 @@ describe("suggested workouts", () => {
     assert.ok(!names.includes("Squat"));
     const lower = buildSplitWorkout("lower", ["bodyweight"]);
     assert.ok(lower.some((ex) => ex.name === "Bulgarian Split Squat" || ex.name === "Walking Lunge"));
+  });
+
+  test("dumbbell-only templates substitute equivalent lifts instead of shrinking", () => {
+    const full = buildSplitWorkout("fullBody", ["dumbbell"]);
+    const lower = buildSplitWorkout("lower", ["dumbbell"]);
+    const upper = buildSplitWorkout("upper", ["dumbbell"]);
+    assert.equal(full.length, 6);
+    assert.equal(lower.length, 6);
+    assert.equal(upper.length, 7);
+    const fullNames = full.map((ex) => ex.name);
+    assert.ok(fullNames.includes("Goblet Squat"));
+    assert.ok(fullNames.includes("Dumbbell Bench Press"));
+    assert.ok(fullNames.includes("Dumbbell Romanian Deadlift"));
+    assert.ok(fullNames.includes("Dumbbell Row"));
+    assert.ok(fullNames.includes("Dumbbell Shoulder Press"));
+    assert.ok(fullNames.includes("Dumbbell Sit-up"));
+    assert.ok(!fullNames.includes("Squat"));
+    assert.ok(!fullNames.includes("Bench Press"));
+    const lowerNames = lower.map((ex) => ex.name);
+    assert.ok(lowerNames.includes("Goblet Squat"));
+    assert.ok(lowerNames.includes("Dumbbell Romanian Deadlift"));
+    assert.ok(lowerNames.includes("Dumbbell Hip Thrust"));
+  });
+
+  test("each equipment type still gets a complete full / upper / lower session", () => {
+    for (const id of EQUIPMENT.map((item) => item.id)) {
+      assert.equal(buildSplitWorkout("fullBody", [id]).length, 6, `${id} full body`);
+      assert.equal(buildSplitWorkout("upper", [id]).length, 7, `${id} upper`);
+      assert.equal(buildSplitWorkout("lower", [id]).length, 6, `${id} lower`);
+    }
   });
 
   test("recent history yields one personalized session that skips a recovering muscle", () => {

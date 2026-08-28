@@ -48,6 +48,7 @@ export const EXERCISES = [
   { name: "Cable Fly", muscle: "chest", equipment: ["cable"] },
   { name: "Dumbbell Fly", muscle: "chest", equipment: ["dumbbell"] },
   { name: "Pec Deck", muscle: "chest", equipment: ["machine"] },
+  { name: "Cable Chest Press", muscle: "chest", equipment: ["cable"] },
   { name: "Push-ups", muscle: "chest", equipment: ["bodyweight"] },
   { name: "Dips", muscle: "chest", equipment: ["bodyweight"] },
 
@@ -64,6 +65,9 @@ export const EXERCISES = [
   { name: "Straight-Arm Pulldown", muscle: "back", equipment: ["cable"] },
   { name: "Inverted Row", muscle: "back", equipment: ["bodyweight"] },
   { name: "Shrugs", muscle: "back", equipment: ["barbell", "dumbbell"] },
+  { name: "Dumbbell Pullover", muscle: "back", equipment: ["dumbbell"] },
+  { name: "Machine Row", muscle: "back", equipment: ["machine"] },
+  { name: "Assisted Pull-up", muscle: "back", equipment: ["machine"] },
 
   // Shoulders
   { name: "Overhead Press", muscle: "shoulders", equipment: ["barbell"] },
@@ -75,6 +79,11 @@ export const EXERCISES = [
   { name: "Rear Delt Fly", muscle: "shoulders", equipment: ["dumbbell"] },
   { name: "Face Pulls", muscle: "shoulders", equipment: ["cable"] },
   { name: "Upright Row", muscle: "shoulders", equipment: ["barbell"] },
+  { name: "Shoulder Press Machine", muscle: "shoulders", equipment: ["machine"] },
+  { name: "Pike Push-ups", muscle: "shoulders", equipment: ["bodyweight"] },
+  { name: "Cable Shoulder Press", muscle: "shoulders", equipment: ["cable"] },
+  { name: "Machine Lateral Raise", muscle: "shoulders", equipment: ["machine"] },
+  { name: "Prone Y Raise", muscle: "shoulders", equipment: ["bodyweight"] },
 
   // Biceps
   { name: "Dumbbell Curl", muscle: "biceps", equipment: ["dumbbell"] },
@@ -84,6 +93,7 @@ export const EXERCISES = [
   { name: "Incline Dumbbell Curl", muscle: "biceps", equipment: ["dumbbell"] },
   { name: "Cable Curl", muscle: "biceps", equipment: ["cable"] },
   { name: "Concentration Curl", muscle: "biceps", equipment: ["dumbbell"] },
+  { name: "Machine Curl", muscle: "biceps", equipment: ["machine"] },
 
   // Triceps
   { name: "Tricep Pushdown", muscle: "triceps", equipment: ["cable"] },
@@ -93,6 +103,8 @@ export const EXERCISES = [
   { name: "Close-Grip Bench Press", muscle: "triceps", equipment: ["barbell"] },
   { name: "Tricep Dips", muscle: "triceps", equipment: ["bodyweight"] },
   { name: "Kickbacks", muscle: "triceps", equipment: ["dumbbell"] },
+  { name: "Diamond Push-ups", muscle: "triceps", equipment: ["bodyweight"] },
+  { name: "Machine Tricep Extension", muscle: "triceps", equipment: ["machine"] },
 
   // Quads
   { name: "Squat", muscle: "quads", equipment: ["barbell"] },
@@ -100,10 +112,13 @@ export const EXERCISES = [
   { name: "Goblet Squat", muscle: "quads", equipment: ["dumbbell"] },
   { name: "Hack Squat", muscle: "quads", equipment: ["machine"] },
   { name: "Leg Press", muscle: "quads", equipment: ["machine"] },
-  { name: "Bulgarian Split Squat", muscle: "quads", equipment: ["dumbbell", "bodyweight"] },
-  { name: "Walking Lunge", muscle: "quads", equipment: ["dumbbell", "bodyweight"] },
+  { name: "Bulgarian Split Squat", muscle: "quads", equipment: ["dumbbell", "bodyweight", "barbell"] },
+  { name: "Walking Lunge", muscle: "quads", equipment: ["dumbbell", "bodyweight", "barbell"] },
   { name: "Leg Extension", muscle: "quads", equipment: ["machine"] },
-  { name: "Step-up", muscle: "quads", equipment: ["dumbbell", "bodyweight"] },
+  { name: "Step-up", muscle: "quads", equipment: ["dumbbell", "bodyweight", "barbell"] },
+  { name: "Sissy Squat", muscle: "quads", equipment: ["bodyweight"] },
+  { name: "Cable Squat", muscle: "quads", equipment: ["cable"] },
+  { name: "Cable Lunge", muscle: "quads", equipment: ["cable"] },
 
   // Hamstrings
   { name: "Romanian Deadlift", muscle: "hamstrings", equipment: ["barbell"] },
@@ -112,6 +127,11 @@ export const EXERCISES = [
   { name: "Seated Leg Curl", muscle: "hamstrings", equipment: ["machine"] },
   { name: "Nordic Curl", muscle: "hamstrings", equipment: ["bodyweight"] },
   { name: "Good Morning", muscle: "hamstrings", equipment: ["barbell"] },
+  { name: "Dumbbell Romanian Deadlift", muscle: "hamstrings", equipment: ["dumbbell"] },
+  { name: "Single-Leg Romanian Deadlift", muscle: "hamstrings", equipment: ["dumbbell", "bodyweight"] },
+  { name: "Sliding Leg Curl", muscle: "hamstrings", equipment: ["bodyweight"] },
+  { name: "Back Extension", muscle: "hamstrings", equipment: ["machine", "bodyweight"] },
+  { name: "Cable Leg Curl", muscle: "hamstrings", equipment: ["cable"] },
 
   // Glutes
   { name: "Hip Thrust", muscle: "glutes", equipment: ["barbell"] },
@@ -119,12 +139,17 @@ export const EXERCISES = [
   { name: "Sumo Deadlift", muscle: "glutes", equipment: ["barbell"] },
   { name: "Cable Kickback", muscle: "glutes", equipment: ["cable"] },
   { name: "Hip Abduction", muscle: "glutes", equipment: ["machine"] },
-  { name: "Reverse Lunge", muscle: "glutes", equipment: ["dumbbell", "bodyweight"] },
+  { name: "Reverse Lunge", muscle: "glutes", equipment: ["dumbbell", "bodyweight", "barbell"] },
+  { name: "Dumbbell Hip Thrust", muscle: "glutes", equipment: ["dumbbell"] },
+  { name: "Single-Leg Glute Bridge", muscle: "glutes", equipment: ["bodyweight"] },
+  { name: "Cable Pull-Through", muscle: "glutes", equipment: ["cable"] },
 
   // Calves
-  { name: "Standing Calf Raise", muscle: "calves", equipment: ["machine", "bodyweight"] },
+  { name: "Standing Calf Raise", muscle: "calves", equipment: ["machine", "bodyweight", "dumbbell", "barbell"] },
   { name: "Seated Calf Raise", muscle: "calves", equipment: ["machine"] },
   { name: "Donkey Calf Raise", muscle: "calves", equipment: ["machine"] },
+  { name: "Dumbbell Calf Raise", muscle: "calves", equipment: ["dumbbell"] },
+  { name: "Cable Calf Raise", muscle: "calves", equipment: ["cable"] },
 
   // Core
   { name: "Plank", muscle: "core", equipment: ["bodyweight"] },
@@ -132,9 +157,12 @@ export const EXERCISES = [
   { name: "Hanging Leg Raise", muscle: "core", equipment: ["bodyweight"] },
   { name: "Cable Crunch", muscle: "core", equipment: ["cable"] },
   { name: "Ab Wheel", muscle: "core", equipment: ["bodyweight"] },
-  { name: "Russian Twist", muscle: "core", equipment: ["bodyweight"] },
+  { name: "Russian Twist", muscle: "core", equipment: ["bodyweight", "dumbbell"] },
   { name: "Pallof Press", muscle: "core", equipment: ["cable"] },
   { name: "Dead Bug", muscle: "core", equipment: ["bodyweight"] },
+  { name: "Dumbbell Sit-up", muscle: "core", equipment: ["dumbbell"] },
+  { name: "Ab Crunch Machine", muscle: "core", equipment: ["machine"] },
+  { name: "Barbell Rollout", muscle: "core", equipment: ["barbell"] },
 ];
 
 /**
@@ -253,20 +281,78 @@ export function adjustTimerSeconds(current, delta, min = 0, max = TIMER_MAX_SECO
 }
 
 const ROLE_FALLBACKS = {
-  squat: ["Squat", "Goblet Squat", "Hack Squat", "Leg Press", "Bulgarian Split Squat", "Walking Lunge"],
-  hinge: ["Romanian Deadlift", "Stiff-Leg Deadlift", "Deadlift", "Good Morning", "Nordic Curl"],
-  hPush: ["Bench Press", "Dumbbell Bench Press", "Incline Dumbbell Press", "Chest Press Machine", "Push-ups", "Dips"],
-  hPull: ["Barbell Row", "Dumbbell Row", "Seated Cable Row", "Chest-Supported Row", "Inverted Row"],
-  vPush: ["Overhead Press", "Dumbbell Shoulder Press", "Arnold Press"],
-  vPull: ["Pull-ups", "Chin-ups", "Lat Pulldown"],
-  laterals: ["Lateral Raise", "Cable Lateral Raise"],
-  biceps: ["Dumbbell Curl", "Hammer Curl", "Barbell Curl", "Cable Curl", "Concentration Curl"],
-  triceps: ["Tricep Pushdown", "Rope Pushdown", "Overhead Tricep Extension", "Tricep Dips", "Close-Grip Bench Press"],
-  core: ["Plank", "Hanging Leg Raise", "Ab Wheel", "Pallof Press", "Dead Bug", "Side Plank"],
-  unilateral: ["Bulgarian Split Squat", "Walking Lunge", "Reverse Lunge", "Step-up"],
-  glute: ["Hip Thrust", "Glute Bridge", "Cable Kickback", "Hip Abduction", "Sumo Deadlift"],
-  hamIso: ["Lying Leg Curl", "Seated Leg Curl", "Nordic Curl"],
-  calves: ["Standing Calf Raise", "Seated Calf Raise", "Donkey Calf Raise"],
+  squat: ["Squat", "Goblet Squat", "Hack Squat", "Leg Press", "Cable Squat", "Bulgarian Split Squat", "Sissy Squat", "Walking Lunge"],
+  hinge: [
+    "Romanian Deadlift",
+    "Dumbbell Romanian Deadlift",
+    "Stiff-Leg Deadlift",
+    "Single-Leg Romanian Deadlift",
+    "Cable Pull-Through",
+    "Back Extension",
+    "Deadlift",
+    "Good Morning",
+    "Nordic Curl",
+    "Sliding Leg Curl",
+  ],
+  hPush: [
+    "Bench Press",
+    "Dumbbell Bench Press",
+    "Incline Dumbbell Press",
+    "Chest Press Machine",
+    "Cable Chest Press",
+    "Push-ups",
+    "Dips",
+    "Cable Fly",
+  ],
+  hPull: ["Barbell Row", "Dumbbell Row", "Seated Cable Row", "Chest-Supported Row", "Machine Row", "Inverted Row"],
+  vPush: ["Overhead Press", "Dumbbell Shoulder Press", "Arnold Press", "Shoulder Press Machine", "Cable Shoulder Press", "Pike Push-ups"],
+  vPull: ["Pull-ups", "Chin-ups", "Lat Pulldown", "Assisted Pull-up", "Dumbbell Pullover", "Machine Row", "T-Bar Row", "Inverted Row"],
+  laterals: ["Lateral Raise", "Cable Lateral Raise", "Machine Lateral Raise", "Upright Row", "Rear Delt Fly", "Prone Y Raise"],
+  biceps: ["Dumbbell Curl", "Hammer Curl", "Barbell Curl", "Cable Curl", "Machine Curl", "Concentration Curl", "Chin-ups"],
+  triceps: [
+    "Tricep Pushdown",
+    "Rope Pushdown",
+    "Overhead Tricep Extension",
+    "Machine Tricep Extension",
+    "Tricep Dips",
+    "Diamond Push-ups",
+    "Close-Grip Bench Press",
+    "Kickbacks",
+  ],
+  core: [
+    "Plank",
+    "Dumbbell Sit-up",
+    "Cable Crunch",
+    "Ab Crunch Machine",
+    "Barbell Rollout",
+    "Russian Twist",
+    "Pallof Press",
+    "Hanging Leg Raise",
+    "Dead Bug",
+    "Side Plank",
+  ],
+  unilateral: ["Bulgarian Split Squat", "Walking Lunge", "Cable Lunge", "Reverse Lunge", "Step-up", "Single-Leg Romanian Deadlift"],
+  glute: [
+    "Hip Thrust",
+    "Dumbbell Hip Thrust",
+    "Cable Pull-Through",
+    "Cable Kickback",
+    "Single-Leg Glute Bridge",
+    "Glute Bridge",
+    "Hip Abduction",
+    "Sumo Deadlift",
+  ],
+  hamIso: [
+    "Lying Leg Curl",
+    "Seated Leg Curl",
+    "Cable Leg Curl",
+    "Dumbbell Romanian Deadlift",
+    "Single-Leg Romanian Deadlift",
+    "Nordic Curl",
+    "Sliding Leg Curl",
+    "Back Extension",
+  ],
+  calves: ["Standing Calf Raise", "Dumbbell Calf Raise", "Seated Calf Raise", "Cable Calf Raise", "Donkey Calf Raise"],
 };
 
 const TEMPLATE_SLOTS = {
@@ -297,6 +383,8 @@ const TEMPLATE_SLOTS = {
   ],
 };
 
+const ROLE_MUSCLE = Object.fromEntries(Object.values(TEMPLATE_SLOTS).flat());
+
 const MUSCLE_PRIORITY = {
   chest: ROLE_FALLBACKS.hPush,
   back: ["Deadlift", ...ROLE_FALLBACKS.hPull, ...ROLE_FALLBACKS.vPull],
@@ -314,22 +402,40 @@ function catalogByName(exercises = EXERCISES) {
   return new Map((exercises || []).map((ex) => [ex.name, ex]));
 }
 
-export function pickExerciseForRole(role, equipmentIds, usedNames = new Set(), exercises = EXERCISES) {
+function pickMatchingExercise(preferredNames, equipmentIds, usedNames, exercises, muscleId) {
   const byName = catalogByName(exercises);
-  for (const name of ROLE_FALLBACKS[role] || []) {
+  for (const name of preferredNames || []) {
     if (usedNames.has(name)) continue;
     const ex = byName.get(name);
     if (ex && exerciseMatchesEquipment(ex, equipmentIds)) return ex;
   }
-  return null;
+  if (!muscleId) return null;
+  return (
+    (exercises || []).find(
+      (ex) =>
+        ex.muscle === muscleId &&
+        !usedNames.has(ex.name) &&
+        exerciseMatchesEquipment(ex, equipmentIds)
+    ) || null
+  );
+}
+
+export function pickExerciseForRole(role, equipmentIds, usedNames = new Set(), exercises = EXERCISES, muscleId) {
+  return pickMatchingExercise(
+    ROLE_FALLBACKS[role],
+    equipmentIds,
+    usedNames,
+    exercises,
+    muscleId || ROLE_MUSCLE[role]
+  );
 }
 
 export function buildSplitWorkout(kind, equipmentIds, exercises = EXERCISES) {
   const slots = TEMPLATE_SLOTS[kind] || [];
   const used = new Set();
   const picked = [];
-  for (const [role] of slots) {
-    const ex = pickExerciseForRole(role, equipmentIds, used, exercises);
+  for (const [role, muscle] of slots) {
+    const ex = pickExerciseForRole(role, equipmentIds, used, exercises, muscle);
     if (!ex) continue;
     used.add(ex.name);
     picked.push({ name: ex.name, setCount: SETS_PER_EXERCISE });
@@ -389,7 +495,6 @@ export function buildPersonalizedWorkout(workouts, equipmentIds, now = new Date(
   const used = new Set();
   const picked = [];
   const chosen = [];
-  const byName = catalogByName(exercises);
 
   for (const target of ranked) {
     if (picked.length >= TARGET_EXERCISES) break;
@@ -397,12 +502,17 @@ export function buildPersonalizedWorkout(workouts, equipmentIds, now = new Date(
     const remaining = TARGET_EXERCISES - picked.length;
     const want = target.weeklySets < 10 && remaining >= 2 ? 2 : 1;
     let added = 0;
-    for (const name of MUSCLE_PRIORITY[target.id] || []) {
-      if (added >= want || picked.length >= TARGET_EXERCISES) break;
-      const ex = byName.get(name);
-      if (!ex || used.has(ex.name) || !exerciseMatchesEquipment(ex, equipmentIds)) continue;
-      used.add(ex.name);
-      picked.push({ name: ex.name, setCount: SETS_PER_EXERCISE });
+    while (added < want && picked.length < TARGET_EXERCISES) {
+      const match = pickMatchingExercise(
+        MUSCLE_PRIORITY[target.id],
+        equipmentIds,
+        used,
+        exercises,
+        target.id
+      );
+      if (!match) break;
+      used.add(match.name);
+      picked.push({ name: match.name, setCount: SETS_PER_EXERCISE });
       added += 1;
     }
     if (added) chosen.push(target);
