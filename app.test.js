@@ -58,6 +58,7 @@ import {
   filterExercisesByEquipment,
   toggleEquipmentId,
   hasAllEquipment,
+  exerciseMatchesEquipment,
   adjustTimerSeconds,
   suggestWorkouts,
   buildSplitWorkout,
@@ -704,46 +705,84 @@ describe("suggested workouts", () => {
     assert.ok(suggestions.every((s) => s.exercises.length >= 6));
   });
 
-  test("templates respect equipment filters", () => {
-    const suggestions = suggestWorkouts([], {
-      equipmentIds: ["bodyweight"],
-      now: new Date("2026-08-24T12:00:00Z"),
+  const TEMPLATE_BY_EQUIPMENT = {
+    all: {
+      fullBody: ["Squat", "Bench Press", "Romanian Deadlift", "Barbell Row", "Overhead Press", "Plank"],
+      upper: ["Bench Press", "Barbell Row", "Overhead Press", "Pull-ups", "Lateral Raise", "Dumbbell Curl", "Tricep Pushdown"],
+      lower: ["Squat", "Romanian Deadlift", "Bulgarian Split Squat", "Hip Thrust", "Lying Leg Curl", "Standing Calf Raise"],
+    },
+    dumbbell: {
+      fullBody: ["Goblet Squat", "Dumbbell Bench Press", "Dumbbell Romanian Deadlift", "Dumbbell Row", "Dumbbell Shoulder Press", "Dumbbell Sit-up"],
+      upper: ["Dumbbell Bench Press", "Dumbbell Row", "Dumbbell Shoulder Press", "Dumbbell Pullover", "Lateral Raise", "Dumbbell Curl", "Overhead Tricep Extension"],
+      lower: ["Goblet Squat", "Dumbbell Romanian Deadlift", "Bulgarian Split Squat", "Dumbbell Hip Thrust", "Single-Leg Romanian Deadlift", "Standing Calf Raise"],
+    },
+    bodyweight: {
+      fullBody: ["Bulgarian Split Squat", "Push-ups", "Single-Leg Romanian Deadlift", "Inverted Row", "Pike Push-ups", "Plank"],
+      upper: ["Push-ups", "Inverted Row", "Pike Push-ups", "Pull-ups", "Prone Y Raise", "Chin-ups", "Tricep Dips"],
+      lower: ["Bulgarian Split Squat", "Single-Leg Romanian Deadlift", "Walking Lunge", "Single-Leg Glute Bridge", "Nordic Curl", "Standing Calf Raise"],
+    },
+    barbell: {
+      fullBody: ["Squat", "Bench Press", "Romanian Deadlift", "Barbell Row", "Overhead Press", "Barbell Rollout"],
+      upper: ["Bench Press", "Barbell Row", "Overhead Press", "T-Bar Row", "Upright Row", "Barbell Curl", "Close-Grip Bench Press"],
+      lower: ["Squat", "Romanian Deadlift", "Bulgarian Split Squat", "Hip Thrust", "Stiff-Leg Deadlift", "Standing Calf Raise"],
+    },
+    machine: {
+      fullBody: ["Hack Squat", "Chest Press Machine", "Back Extension", "Machine Row", "Shoulder Press Machine", "Ab Crunch Machine"],
+      upper: ["Chest Press Machine", "Machine Row", "Shoulder Press Machine", "Assisted Pull-up", "Machine Lateral Raise", "Machine Curl", "Machine Tricep Extension"],
+      lower: ["Hack Squat", "Back Extension", "Leg Press", "Hip Abduction", "Lying Leg Curl", "Standing Calf Raise"],
+    },
+    cable: {
+      fullBody: ["Cable Squat", "Cable Chest Press", "Cable Pull-Through", "Seated Cable Row", "Cable Shoulder Press", "Cable Crunch"],
+      upper: ["Cable Chest Press", "Seated Cable Row", "Cable Shoulder Press", "Lat Pulldown", "Cable Lateral Raise", "Cable Curl", "Tricep Pushdown"],
+      lower: ["Cable Squat", "Cable Pull-Through", "Cable Lunge", "Cable Kickback", "Cable Leg Curl", "Cable Calf Raise"],
+    },
+  };
+
+  function equipmentFor(id) {
+    return id === "all" ? defaultEquipmentIds() : [id];
+  }
+
+  function namesOf(kind, equipmentIds) {
+    return buildSplitWorkout(kind, equipmentIds).map((ex) => ex.name);
+  }
+
+  for (const [filterId, expected] of Object.entries(TEMPLATE_BY_EQUIPMENT)) {
+    test(`${filterId} filter keeps complete Full / Upper / Lower substitutions`, () => {
+      const equipmentIds = equipmentFor(filterId);
+      assert.deepEqual(namesOf("fullBody", equipmentIds), expected.fullBody);
+      assert.deepEqual(namesOf("upper", equipmentIds), expected.upper);
+      assert.deepEqual(namesOf("lower", equipmentIds), expected.lower);
+
+      const suggestions = suggestWorkouts([], {
+        equipmentIds,
+        now: new Date("2026-08-24T12:00:00Z"),
+      });
+      assert.equal(suggestions.length, 3);
+      assert.deepEqual(
+        suggestions.map((item) => item.exercises.map((ex) => ex.name)),
+        [expected.fullBody, expected.upper, expected.lower]
+      );
+
+      if (filterId === "all") return;
+      for (const item of suggestions.flatMap((s) => s.exercises)) {
+        const catalog = EXERCISES.find((ex) => ex.name === item.name);
+        assert.ok(catalog, `missing catalog entry for ${item.name}`);
+        assert.equal(
+          exerciseMatchesEquipment(catalog, equipmentIds),
+          true,
+          `${item.name} is not valid for ${filterId}`
+        );
+      }
     });
-    const names = suggestions.flatMap((s) => s.exercises.map((ex) => ex.name));
-    assert.ok(names.includes("Push-ups"));
-    assert.ok(!names.includes("Bench Press"));
-    assert.ok(!names.includes("Squat"));
-    const lower = buildSplitWorkout("lower", ["bodyweight"]);
-    assert.ok(lower.some((ex) => ex.name === "Bulgarian Split Squat" || ex.name === "Walking Lunge"));
-  });
+  }
 
-  test("dumbbell-only templates substitute equivalent lifts instead of shrinking", () => {
-    const full = buildSplitWorkout("fullBody", ["dumbbell"]);
-    const lower = buildSplitWorkout("lower", ["dumbbell"]);
-    const upper = buildSplitWorkout("upper", ["dumbbell"]);
-    assert.equal(full.length, 6);
-    assert.equal(lower.length, 6);
-    assert.equal(upper.length, 7);
-    const fullNames = full.map((ex) => ex.name);
-    assert.ok(fullNames.includes("Goblet Squat"));
-    assert.ok(fullNames.includes("Dumbbell Bench Press"));
-    assert.ok(fullNames.includes("Dumbbell Romanian Deadlift"));
-    assert.ok(fullNames.includes("Dumbbell Row"));
-    assert.ok(fullNames.includes("Dumbbell Shoulder Press"));
-    assert.ok(fullNames.includes("Dumbbell Sit-up"));
-    assert.ok(!fullNames.includes("Squat"));
-    assert.ok(!fullNames.includes("Bench Press"));
-    const lowerNames = lower.map((ex) => ex.name);
-    assert.ok(lowerNames.includes("Goblet Squat"));
-    assert.ok(lowerNames.includes("Dumbbell Romanian Deadlift"));
-    assert.ok(lowerNames.includes("Dumbbell Hip Thrust"));
-  });
-
-  test("each equipment type still gets a complete full / upper / lower session", () => {
-    for (const id of EQUIPMENT.map((item) => item.id)) {
-      assert.equal(buildSplitWorkout("fullBody", [id]).length, 6, `${id} full body`);
-      assert.equal(buildSplitWorkout("upper", [id]).length, 7, `${id} upper`);
-      assert.equal(buildSplitWorkout("lower", [id]).length, 6, `${id} lower`);
+  test("restricted filters never keep a barbell-only compound", () => {
+    for (const id of ["dumbbell", "bodyweight", "machine", "cable"]) {
+      const names = ["fullBody", "upper", "lower"]
+        .flatMap((kind) => namesOf(kind, [id]));
+      for (const banned of ["Squat", "Bench Press", "Deadlift", "Barbell Row"]) {
+        assert.ok(!names.includes(banned), `${id} should not include ${banned}`);
+      }
     }
   });
 
