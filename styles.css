@@ -235,6 +235,19 @@ body {
   gap: 0.4rem;
 }
 
+.builder-block-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem;
+  margin-bottom: 0.45rem;
+}
+
+.builder-block-header .superset-badge {
+  margin-bottom: 0;
+}
+
 .builder-actions {
   display: flex;
   flex-wrap: wrap;

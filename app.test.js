@@ -72,6 +72,8 @@ import {
   groupedWorkoutItems,
   togglePairWithNext,
   moveExercise,
+  moveWorkoutBlock,
+  swapSupersetPartners,
   normalizeSupersetAdjacency,
   shouldStartRestTimer,
   restNotificationPayload,
@@ -1059,18 +1061,78 @@ describe("supersets and rest-timer gating", () => {
     assert.ok(list[1].supersetId);
   });
 
-  test("moving a lift out of a pair clears the superset", () => {
-    let list = togglePairWithNext(
-      [createExercise("Squat"), createExercise("Bench Press"), createExercise("Row")],
-      0
+  test("moving a standalone skips over a superset without unpairing", () => {
+    const list = moveWorkoutBlock(
+      [
+        createExercise("Row"),
+        createExercise("Squat", 3, null, { supersetId: "ss-1" }),
+        createExercise("Bench Press", 3, null, { supersetId: "ss-1" }),
+      ],
+      0,
+      1
     );
-    list = moveExercise(list, 0, 2);
     assert.deepEqual(
       list.map((ex) => ex.name),
-      ["Bench Press", "Row", "Squat"]
+      ["Squat", "Bench Press", "Row"]
     );
-    assert.equal(list[0].supersetId, null);
+    assert.equal(list[0].supersetId, "ss-1");
+    assert.equal(list[1].supersetId, "ss-1");
     assert.equal(list[2].supersetId, null);
+  });
+
+  test("moving a superset block past a standalone keeps the pair", () => {
+    const list = moveWorkoutBlock(
+      [
+        createExercise("Squat", 3, null, { supersetId: "ss-1" }),
+        createExercise("Bench Press", 3, null, { supersetId: "ss-1" }),
+        createExercise("Row"),
+      ],
+      0,
+      1
+    );
+    assert.deepEqual(
+      list.map((ex) => ex.name),
+      ["Row", "Squat", "Bench Press"]
+    );
+    assert.equal(list[1].supersetId, list[2].supersetId);
+    assert.equal(list[0].supersetId, null);
+  });
+
+  test("moveExercise on either lift in a pair moves the whole block", () => {
+    const start = [
+      createExercise("Row"),
+      createExercise("Squat", 3, null, { supersetId: "ss-1" }),
+      createExercise("Bench Press", 3, null, { supersetId: "ss-1" }),
+    ];
+    const fromFirst = moveExercise(start, 1, -1);
+    const fromSecond = moveExercise(start, 2, -1);
+    assert.deepEqual(
+      fromFirst.map((ex) => ex.name),
+      ["Squat", "Bench Press", "Row"]
+    );
+    assert.deepEqual(
+      fromSecond.map((ex) => ex.name),
+      ["Squat", "Bench Press", "Row"]
+    );
+    assert.equal(fromFirst[0].supersetId, fromFirst[1].supersetId);
+    assert.equal(fromFirst[2].supersetId, null);
+  });
+
+  test("swapSupersetPartners flips order inside the pair", () => {
+    const list = swapSupersetPartners(
+      [
+        createExercise("Squat", 3, null, { supersetId: "ss-1" }),
+        createExercise("Bench Press", 3, null, { supersetId: "ss-1" }),
+        createExercise("Row"),
+      ],
+      0
+    );
+    assert.deepEqual(
+      list.map((ex) => ex.name),
+      ["Bench Press", "Squat", "Row"]
+    );
+    assert.equal(list[0].supersetId, "ss-1");
+    assert.equal(list[1].supersetId, "ss-1");
   });
 
   test("normalizeSupersetAdjacency drops orphan ids", () => {

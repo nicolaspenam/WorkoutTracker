@@ -10,7 +10,7 @@ A simple, mobile-friendly workout tracker built with vanilla HTML, CSS, and Java
 - Filter exercises by the **equipment you have** (all types on by default — tap Dumbbell or Bodyweight to limit the list)
 - Filter the (expanded) exercise list by main muscle chips that wrap onto extra rows: chest, back, shoulders, arms, legs, glutes, calves, core
 - **Suggested workouts** based on recent training: if you have not trained in about a week you get Full body, Upper, and Lower options; otherwise one session aimed at muscles that are due (hypertrophy targets of ~10–20 weekly sets, ~2×/week, ~48h recovery). Suggestions use **supersets by default** (antagonist or non-competing pairs so rest time drops without cutting load)
-- Build your own supersets while assembling a workout; saved workouts keep order and pairing
+- Build your own supersets while assembling a workout (pairs of two, moved as one block); saved workouts keep order and pairing
 - Rest timer starts when a set is completed — pick **1:00 / 1:30 / 2:00**, and nudge **±15s** while it runs. In a superset the timer waits until **both** lifts finish that set
 - Optional **rest-over notification** (on by default): allow notifications and the phone will ping when rest hits 0:00, aimed at Android PWAs (iOS installed apps too when the OS allows it)
 - Log weight and reps per set, with add/remove set controls
