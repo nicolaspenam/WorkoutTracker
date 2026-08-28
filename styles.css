@@ -104,9 +104,8 @@ body {
   top: max(0.5rem, env(safe-area-inset-top, 0px));
   z-index: 100;
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
+  flex-direction: column;
+  gap: 0.65rem;
   background: var(--surface);
   border: 1px solid var(--accent);
   border-radius: var(--radius);
@@ -115,6 +114,118 @@ body {
   box-shadow: 0 4px 20px rgba(59, 130, 246, 0.25);
   backdrop-filter: blur(10px);
   transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.timer-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.timer-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.timer-adjust-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+}
+
+.btn-timer-adjust {
+  min-height: var(--tap);
+  min-width: 0;
+  padding: 0.35rem 0.55rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.btn-timer-adjust:active {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.rest-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.rest-presets-compact {
+  justify-content: stretch;
+}
+
+.rest-presets-compact .rest-chip {
+  flex: 1;
+}
+
+.rest-chip {
+  min-height: var(--tap);
+  padding: 0.35rem 0.75rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.rest-chip.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.suggestion-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.suggestion-card {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.85rem;
+}
+
+.suggestion-card h3 {
+  font-size: 1rem;
+  margin-bottom: 0.25rem;
+}
+
+.suggestion-reason {
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  margin-bottom: 0.5rem;
+}
+
+.suggestion-summary {
+  font-size: 0.85rem;
+  margin-bottom: 0.7rem;
+}
+
+.suggestion-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.4rem;
+}
+
+.saved-item-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  flex-shrink: 0;
 }
 
 .rest-timer-bar.hidden {
@@ -522,6 +633,75 @@ body {
   margin-top: 0.15rem;
 }
 
+.exercise-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex-shrink: 0;
+}
+
+.btn-swap {
+  min-height: 2.1rem;
+  padding: 0.25rem 0.7rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+#track-add-exercise-btn {
+  margin-bottom: 0.75rem;
+}
+
+.modal {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(0, 0, 0, 0.55);
+}
+
+.modal.hidden {
+  display: none;
+}
+
+.modal-card {
+  width: min(100%, 560px);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 1rem;
+  box-shadow: var(--shadow);
+  margin-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+.modal-card .select {
+  width: 100%;
+  margin: 0.65rem 0 0.85rem;
+}
+
+.modal-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+}
+
+.update-routine-prompt {
+  margin-top: 1rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid var(--border);
+}
+
+.update-routine-prompt.hidden {
+  display: none;
+}
+
 .set-controls {
   display: flex;
   align-items: center;
@@ -806,6 +986,11 @@ body {
 
   .exercise-header {
     flex-wrap: wrap;
+  }
+
+  .exercise-header-actions {
+    width: 100%;
+    justify-content: space-between;
   }
 
   .import-confirm .backup-actions {

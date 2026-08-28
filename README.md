@@ -2,19 +2,24 @@
 
 **[Open the app](https://nicolaspenam.github.io/WorkoutTracker/)** — https://nicolaspenam.github.io/WorkoutTracker/
 
-A simple, mobile-friendly workout tracker built with vanilla HTML, CSS, and JavaScript. Workouts are saved in your browser (`localStorage`) so you can reuse them and track PRs over time.
+A simple, mobile-friendly workout tracker built with vanilla HTML, CSS, and JavaScript. Workouts are saved in your browser (`localStorage`) so you can reuse them and track PRs over time. On Android you can also **install it as an app** from the browser menu (Add to Home screen / Install app).
 
 ## Features
 
 - Build a workout from a dropdown, or reuse a previous session from **History**
+- Filter exercises by the **equipment you have** (all types on by default — tap Dumbbell or Bodyweight to limit the list)
 - Filter the (expanded) exercise list by main muscle chips that wrap onto extra rows: chest, back, shoulders, arms, legs, glutes, calves, core
+- **Suggested workouts** based on recent training: if you have not trained in about a week you get Full body, Upper, and Lower options; otherwise one session aimed at muscles that are due (hypertrophy targets of ~10–20 weekly sets, ~2×/week, ~48h recovery)
 - Optional name for each workout (e.g. “Push Day”)
 - Log weight and reps per set, with add/remove set controls
+- **Swap** an exercise in the middle of a session (or add one). If you started from a saved workout, Finish asks whether to update it for next time — history and PRs stay as logged
 - See last time’s weight/reps for each set and tap **✓** to copy them
 - Previous numbers stay in amber; values you type or confirm use a green style
-- Rest timer starts when a set is completed
+- Rest timer starts when a set is completed — pick **1:00 / 1:30 / 2:00**, and nudge **±15s** while it runs
 - Look up personal records (heaviest set, then most reps) from the **PRs** tab
 - Finish a workout to save it and view a summary
+- Remove a workout from the saved list without deleting history or PRs
+- Save a suggestion to that list for later
 - **Export / import** a JSON backup from History to move devices or keep a snapshot off-browser
 
 ## Live site
@@ -35,17 +40,17 @@ Serve the folder (ES modules need a local server, not `file://`):
 npx serve .
 ```
 
-Then open the URL in your phone or browser.
+Then open the URL in your phone or browser. In Chrome on Android, use **Install app** / **Add to Home screen** to pin it.
 
 ## Usage
 
-1. Optionally name the workout, then add exercises — pick a muscle chip first to narrow the list, or open **History** and tap **Use workout**
+1. Optionally name the workout, then add exercises — pick equipment and/or a muscle chip first to narrow the list, use a suggestion, or open **History** and tap **Use workout**
 2. Tap **Start Workout**
 3. Enter weight and reps, or tap **✓** to fill last time’s numbers for that set
-4. Use **+** / **−** to add or remove sets
+4. Use **+** / **−** to add or remove sets; rest defaults to 1:30 and can be changed or nudged ±15s
 5. **Finish Workout** saves the session and updates PRs
 6. Search an exercise on the **PRs** tab (or filter by muscle) to see your best set
-7. On **History**, use **Export backup** to download a JSON file (save it to Drive/iCloud). **Import backup** restores it — merge keeps existing sessions, replace overwrites this device
+7. On **History**, **Remove** hides a workout from the list only. Use **Export backup** to download a JSON file (save it to Drive/iCloud). **Import backup** restores it — merge keeps existing sessions, replace overwrites this device
 
 ## Tests
 

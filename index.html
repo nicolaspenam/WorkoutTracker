@@ -3,10 +3,17 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Workout Tracker</title>
+  <meta name="description" content="Log gym sessions, rest between sets, and track personal records.">
   <meta name="theme-color" content="#0f1419">
   <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Workouts">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <title>Workout Tracker</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="favicon.ico" sizes="any">
+  <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <meta name="mobile-web-app-capable" content="yes">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -25,6 +32,23 @@
       </nav>
 
       <div id="panel-workout" class="tab-panel" role="tabpanel">
+        <div class="card">
+          <h2 class="card-title">Suggested for you</h2>
+          <p class="card-help" id="suggest-help">Based on recent training and the equipment you have.</p>
+          <div id="suggestion-list" class="suggestion-list"></div>
+        </div>
+
+        <div class="card">
+          <label class="label">Equipment you have</label>
+          <p class="card-help">All equipment is on by default. Tap a type to keep only that gear, then add others you have. Suggestions follow this filter.</p>
+          <div class="muscle-filters" id="equipment-filters" role="group" aria-label="Available equipment"></div>
+        </div>
+
+        <div class="card">
+          <label class="label">Rest between sets</label>
+          <div class="rest-presets" id="rest-presets" role="group" aria-label="Default rest duration"></div>
+        </div>
+
         <div class="card">
           <label for="workout-name" class="label">Workout name <span class="optional">(optional)</span></label>
           <input
@@ -81,8 +105,8 @@
         </div>
 
         <div class="card">
-          <h2 class="card-title">Previous workouts</h2>
-          <p class="card-help">Reuse a saved session instead of building from scratch.</p>
+          <h2 class="card-title">Saved workouts</h2>
+          <p class="card-help">Reuse a session or a saved suggestion. Remove hides it from this list only — history and PRs stay intact.</p>
           <ul id="saved-workouts-list" class="saved-list"></ul>
         </div>
       </div>
@@ -108,15 +132,26 @@
     <!-- Phase 2: Track sets -->
     <section id="track-phase" class="phase hidden">
       <div id="rest-timer-bar" class="rest-timer-bar hidden">
-        <div class="timer-info">
-          <span class="timer-icon" aria-hidden="true">⏱</span>
-          <span class="timer-title">Rest Timer</span>
+        <div class="timer-top">
+          <div class="timer-info">
+            <span class="timer-icon" aria-hidden="true">⏱</span>
+            <span class="timer-title">Rest</span>
+            <div class="timer-countdown" id="timer-display">1:30</div>
+          </div>
+          <button type="button" id="dismiss-timer-btn" class="btn-timer-dismiss" aria-label="Dismiss timer">✕</button>
         </div>
-        <div class="timer-countdown" id="timer-display">1:30</div>
-        <button type="button" id="dismiss-timer-btn" class="btn-timer-dismiss" aria-label="Dismiss timer">✕</button>
+        <div class="timer-adjust-row">
+          <button type="button" id="timer-minus-btn" class="btn-timer-adjust" aria-label="Subtract 15 seconds">−15s</button>
+          <button type="button" id="timer-plus-btn" class="btn-timer-adjust" aria-label="Add 15 seconds">+15s</button>
+        </div>
+        <div class="rest-presets rest-presets-compact" id="timer-rest-presets"></div>
       </div>
 
       <div id="sets-container"></div>
+
+      <button type="button" id="track-add-exercise-btn" class="btn btn-secondary btn-full">
+        Add exercise
+      </button>
 
       <button type="button" id="finish-workout-btn" class="btn btn-primary btn-full btn-sticky">
         Finish Workout
@@ -138,12 +173,36 @@
           autocomplete="off"
         >
         <div id="summary-details"></div>
+        <div id="update-routine-prompt" class="update-routine-prompt hidden">
+          <h3 class="card-title">Update saved workout?</h3>
+          <p id="update-routine-text" class="card-help"></p>
+          <div class="backup-actions">
+            <button type="button" id="update-routine-yes" class="btn btn-primary">Update</button>
+            <button type="button" id="update-routine-no" class="btn btn-secondary">Keep original</button>
+          </div>
+          <p id="update-routine-status" class="backup-status" role="status"></p>
+        </div>
       </div>
 
       <button type="button" id="new-workout-btn" class="btn btn-primary btn-full btn-sticky">
         Start New Workout
       </button>
     </section>
+  </div>
+
+  <div id="swap-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="swap-title">
+    <div class="modal-card">
+      <h2 id="swap-title">Swap exercise</h2>
+      <p id="swap-help" class="card-help"></p>
+      <div class="muscle-filters" id="swap-muscle-filters" role="toolbar" aria-label="Filter swap list by muscle"></div>
+      <select id="swap-select" class="select">
+        <option value="">Choose an exercise…</option>
+      </select>
+      <div class="backup-actions modal-actions">
+        <button type="button" id="swap-confirm-btn" class="btn btn-primary">Swap</button>
+        <button type="button" id="swap-cancel-btn" class="btn btn-secondary">Cancel</button>
+      </div>
+    </div>
   </div>
 
   <script type="module" src="app.js"></script>

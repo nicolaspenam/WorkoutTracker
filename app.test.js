@@ -29,6 +29,10 @@ import {
   addSet,
   removeSet,
   workoutToExercises,
+  exerciseStructure,
+  structuresEqual,
+  swapExerciseAt,
+  updateSavedWorkoutRoutine,
   isBetterSet,
   computePersonalRecords,
   queryPersonalRecords,
@@ -49,6 +53,23 @@ import {
   getMuscleForExercise,
   getMuscleLabel,
   filterRecordsByMuscle,
+  EQUIPMENT,
+  REST_PRESETS,
+  LOOKBACK_DAYS,
+  TIMER_ADJUST_SECONDS,
+  defaultEquipmentIds,
+  filterCatalog,
+  filterExercisesByEquipment,
+  toggleEquipmentId,
+  hasAllEquipment,
+  exerciseMatchesEquipment,
+  adjustTimerSeconds,
+  suggestWorkouts,
+  buildSplitWorkout,
+  saveSuggestionTemplate,
+  removeTemplate,
+  hideWorkoutFromLibrary,
+  visibleLibraryItems,
 } from "./logic.js";
 
 // ─── formatTime ───────────────────────────────────────────────────────────────
@@ -360,6 +381,74 @@ describe("workoutToExercises", () => {
     assert.equal(ex.sets[0].previousWeight, 225);
     assert.equal(ex.sets[1].previousReps, 3);
   });
+
+  test("prefers a saved routine overlay when reusing a history session", () => {
+    const saved = {
+      name: "Push Day",
+      exercises: [{ name: "Bench Press", sets: [{ weight: 185, reps: 5 }] }],
+      routine: [{ name: "Dumbbell Bench Press", sets: [{ weight: null, reps: null }, { weight: null, reps: null }] }],
+    };
+    const [ex] = workoutToExercises(saved, [saved]);
+    assert.equal(ex.name, "Dumbbell Bench Press");
+    assert.equal(ex.sets.length, 2);
+    assert.equal(ex.sets[0].previousWeight, null);
+  });
+});
+
+describe("swap / saved routine", () => {
+  test("swapExerciseAt replaces the name and keeps the set count", () => {
+    const current = [createExercise("Bench Press", 4)];
+    const next = swapExerciseAt(current, 0, "Dumbbell Bench Press");
+    assert.equal(next[0].name, "Dumbbell Bench Press");
+    assert.equal(next[0].sets.length, 4);
+    assert.equal(next[0].sets[0].weight, "");
+    assert.equal(current[0].name, "Bench Press");
+  });
+
+  test("swapExerciseAt refuses a duplicate name", () => {
+    const current = [createExercise("Bench Press"), createExercise("Squat")];
+    const next = swapExerciseAt(current, 0, "Squat");
+    assert.equal(next[0].name, "Bench Press");
+  });
+
+  test("structuresEqual detects name or set-count changes", () => {
+    const original = exerciseStructure([createExercise("Bench Press", 3)]);
+    assert.equal(structuresEqual(original, [{ name: "Bench Press", setCount: 3 }]), true);
+    assert.equal(structuresEqual(original, [{ name: "Dumbbell Bench Press", setCount: 3 }]), false);
+    assert.equal(structuresEqual(original, [{ name: "Bench Press", setCount: 4 }]), false);
+  });
+
+  test("updating a template replaces its exercises without touching history", () => {
+    const templates = [{ id: "t1", name: "Upper", exercises: [{ name: "Bench Press", sets: [{}, {}, {}] }] }];
+    const workouts = [{ id: "w1", name: "Upper", exercises: [{ name: "Bench Press", sets: [{ weight: 185, reps: 5 }] }] }];
+    const next = updateSavedWorkoutRoutine(
+      templates,
+      workouts,
+      { kind: "template", id: "t1" },
+      [createExercise("Dumbbell Bench Press", 3)]
+    );
+    assert.equal(next.templates[0].exercises[0].name, "Dumbbell Bench Press");
+    assert.equal(next.workouts[0].exercises[0].name, "Bench Press");
+    assert.equal(next.workouts[0].exercises[0].sets[0].weight, 185);
+  });
+
+  test("updating a history session stores a routine overlay and keeps logged sets", () => {
+    const workouts = [{
+      id: "w1",
+      name: "Push Day",
+      exercises: [{ name: "Bench Press", sets: [{ weight: 185, reps: 5 }] }],
+    }];
+    const next = updateSavedWorkoutRoutine(
+      [],
+      workouts,
+      { kind: "history", id: "w1" },
+      [createExercise("Dumbbell Bench Press", 3)]
+    );
+    assert.equal(next.workouts[0].exercises[0].name, "Bench Press");
+    assert.equal(next.workouts[0].exercises[0].sets[0].weight, 185);
+    assert.equal(next.workouts[0].routine[0].name, "Dumbbell Bench Press");
+    assert.equal(computePersonalRecords(next.workouts)["Bench Press"].weight, 185);
+  });
 });
 
 // ─── personal records ─────────────────────────────────────────────────────────
@@ -631,5 +720,252 @@ describe("exercise catalog / muscle filter", () => {
     const chest = filterRecordsByMuscle(records, "chest");
     assert.deepEqual(chest.map((r) => r.name), ["Bench Press"]);
     assert.equal(filterRecordsByMuscle(records, null).length, 3);
+  });
+});
+
+describe("equipment filter", () => {
+  const allowed = new Set(EQUIPMENT.map((item) => item.id));
+
+  test("every exercise has at least one known equipment tag", () => {
+    for (const ex of EXERCISES) {
+      assert.ok(Array.isArray(ex.equipment) && ex.equipment.length, `${ex.name} missing equipment`);
+      assert.ok(ex.equipment.every((id) => allowed.has(id)), `${ex.name} has unknown equipment`);
+    }
+  });
+
+  test("bodyweight-only catalog still includes push-ups and squats via bodyweight tags", () => {
+    const filtered = filterExercisesByEquipment(EXERCISES, ["bodyweight"]);
+    const names = filtered.map((ex) => ex.name);
+    assert.ok(names.includes("Push-ups"));
+    assert.ok(names.includes("Plank"));
+    assert.ok(!names.includes("Bench Press"));
+    assert.ok(!names.includes("Lat Pulldown"));
+  });
+
+  test("dumbbell-only keeps dumbbell bench and drops barbell bench", () => {
+    const filtered = filterCatalog(EXERCISES, "chest", ["dumbbell"]);
+    const names = filtered.map((ex) => ex.name);
+    assert.ok(names.includes("Dumbbell Bench Press"));
+    assert.ok(!names.includes("Bench Press"));
+  });
+
+  test("toggle from all isolates that type; never allows an empty selection", () => {
+    const all = defaultEquipmentIds();
+    assert.equal(hasAllEquipment(all), true);
+    assert.deepEqual(toggleEquipmentId(all, "dumbbell"), ["dumbbell"]);
+    assert.deepEqual(toggleEquipmentId(["dumbbell"], "bodyweight").sort(), ["bodyweight", "dumbbell"]);
+    assert.deepEqual(toggleEquipmentId(["dumbbell"], "dumbbell"), all);
+  });
+});
+
+describe("rest timer helpers", () => {
+  test("presets are 1:00, 1:30, and 2:00", () => {
+    assert.deepEqual(REST_PRESETS, [60, 90, 120]);
+  });
+
+  test("adjustTimerSeconds clamps and steps by 15", () => {
+    assert.equal(adjustTimerSeconds(90, TIMER_ADJUST_SECONDS), 105);
+    assert.equal(adjustTimerSeconds(10, -TIMER_ADJUST_SECONDS), 0);
+    assert.equal(adjustTimerSeconds(590, 15), 600);
+  });
+});
+
+describe("suggested workouts", () => {
+  test("with no recent sessions offers full / upper / lower templates", () => {
+    const suggestions = suggestWorkouts([], { now: new Date("2026-08-24T12:00:00Z") });
+    assert.deepEqual(suggestions.map((s) => s.kind), ["fullBody", "upper", "lower"]);
+    assert.ok(suggestions.every((s) => s.exercises.length >= 6));
+  });
+
+  const TEMPLATE_BY_EQUIPMENT = {
+    all: {
+      fullBody: ["Squat", "Bench Press", "Romanian Deadlift", "Barbell Row", "Overhead Press", "Plank"],
+      upper: ["Bench Press", "Barbell Row", "Overhead Press", "Pull-ups", "Lateral Raise", "Dumbbell Curl", "Tricep Pushdown"],
+      lower: ["Squat", "Romanian Deadlift", "Bulgarian Split Squat", "Hip Thrust", "Lying Leg Curl", "Standing Calf Raise"],
+    },
+    dumbbell: {
+      fullBody: ["Goblet Squat", "Dumbbell Bench Press", "Dumbbell Romanian Deadlift", "Dumbbell Row", "Dumbbell Shoulder Press", "Dumbbell Sit-up"],
+      upper: ["Dumbbell Bench Press", "Dumbbell Row", "Dumbbell Shoulder Press", "Dumbbell Pullover", "Lateral Raise", "Dumbbell Curl", "Overhead Tricep Extension"],
+      lower: ["Goblet Squat", "Dumbbell Romanian Deadlift", "Bulgarian Split Squat", "Dumbbell Hip Thrust", "Single-Leg Romanian Deadlift", "Standing Calf Raise"],
+    },
+    bodyweight: {
+      fullBody: ["Bulgarian Split Squat", "Push-ups", "Single-Leg Romanian Deadlift", "Inverted Row", "Pike Push-ups", "Plank"],
+      upper: ["Push-ups", "Inverted Row", "Pike Push-ups", "Towel Row", "Prone Y Raise", "Towel Curl", "Tricep Dips"],
+      lower: ["Bulgarian Split Squat", "Single-Leg Romanian Deadlift", "Walking Lunge", "Single-Leg Glute Bridge", "Nordic Curl", "Standing Calf Raise"],
+    },
+    barbell: {
+      fullBody: ["Squat", "Bench Press", "Romanian Deadlift", "Barbell Row", "Overhead Press", "Barbell Rollout"],
+      upper: ["Bench Press", "Barbell Row", "Overhead Press", "T-Bar Row", "Upright Row", "Barbell Curl", "Close-Grip Bench Press"],
+      lower: ["Squat", "Romanian Deadlift", "Bulgarian Split Squat", "Hip Thrust", "Stiff-Leg Deadlift", "Standing Calf Raise"],
+    },
+    machine: {
+      fullBody: ["Hack Squat", "Chest Press Machine", "Back Extension", "Machine Row", "Shoulder Press Machine", "Ab Crunch Machine"],
+      upper: ["Chest Press Machine", "Machine Row", "Shoulder Press Machine", "Assisted Pull-up", "Machine Lateral Raise", "Machine Curl", "Machine Tricep Extension"],
+      lower: ["Hack Squat", "Back Extension", "Leg Press", "Hip Abduction", "Lying Leg Curl", "Standing Calf Raise"],
+    },
+    cable: {
+      fullBody: ["Cable Squat", "Cable Chest Press", "Cable Pull-Through", "Seated Cable Row", "Cable Shoulder Press", "Cable Crunch"],
+      upper: ["Cable Chest Press", "Seated Cable Row", "Cable Shoulder Press", "Lat Pulldown", "Cable Lateral Raise", "Cable Curl", "Tricep Pushdown"],
+      lower: ["Cable Squat", "Cable Pull-Through", "Cable Lunge", "Cable Kickback", "Cable Leg Curl", "Cable Calf Raise"],
+    },
+  };
+
+  function equipmentFor(id) {
+    return id === "all" ? defaultEquipmentIds() : [id];
+  }
+
+  function namesOf(kind, equipmentIds) {
+    return buildSplitWorkout(kind, equipmentIds).map((ex) => ex.name);
+  }
+
+  for (const [filterId, expected] of Object.entries(TEMPLATE_BY_EQUIPMENT)) {
+    test(`${filterId} filter keeps complete Full / Upper / Lower substitutions`, () => {
+      const equipmentIds = equipmentFor(filterId);
+      assert.deepEqual(namesOf("fullBody", equipmentIds), expected.fullBody);
+      assert.deepEqual(namesOf("upper", equipmentIds), expected.upper);
+      assert.deepEqual(namesOf("lower", equipmentIds), expected.lower);
+
+      const suggestions = suggestWorkouts([], {
+        equipmentIds,
+        now: new Date("2026-08-24T12:00:00Z"),
+      });
+      assert.equal(suggestions.length, 3);
+      assert.deepEqual(
+        suggestions.map((item) => item.exercises.map((ex) => ex.name)),
+        [expected.fullBody, expected.upper, expected.lower]
+      );
+
+      if (filterId === "all") return;
+      for (const item of suggestions.flatMap((s) => s.exercises)) {
+        const catalog = EXERCISES.find((ex) => ex.name === item.name);
+        assert.ok(catalog, `missing catalog entry for ${item.name}`);
+        assert.equal(
+          exerciseMatchesEquipment(catalog, equipmentIds),
+          true,
+          `${item.name} is not valid for ${filterId}`
+        );
+      }
+    });
+  }
+
+  test("bodyweight-only suggestions do not assume a pull-up bar", () => {
+    const names = ["fullBody", "upper", "lower"].flatMap((kind) =>
+      namesOf(kind, ["bodyweight"])
+    );
+    for (const banned of ["Pull-ups", "Chin-ups", "Hanging Leg Raise"]) {
+      assert.ok(!names.includes(banned), `bodyweight suggestion should not include ${banned}`);
+    }
+    assert.ok(names.includes("Inverted Row"));
+    assert.ok(names.includes("Towel Row"));
+    const catalog = filterExercisesByEquipment(EXERCISES, ["bodyweight"]).map((ex) => ex.name);
+    assert.ok(catalog.includes("Pull-ups"), "pull-ups stay in the bodyweight list for people who have a bar");
+  });
+
+  test("restricted filters never keep a barbell-only compound", () => {
+    for (const id of ["dumbbell", "bodyweight", "machine", "cable"]) {
+      const names = ["fullBody", "upper", "lower"]
+        .flatMap((kind) => namesOf(kind, [id]));
+      for (const banned of ["Squat", "Bench Press", "Deadlift", "Barbell Row"]) {
+        assert.ok(!names.includes(banned), `${id} should not include ${banned}`);
+      }
+    }
+  });
+
+  test("recent history yields one personalized session that skips a recovering muscle", () => {
+    const workouts = [
+      {
+        id: "w1",
+        name: "Push",
+        completedAt: "2026-08-23T18:00:00Z",
+        exercises: [
+          {
+            name: "Bench Press",
+            sets: [
+              { weight: 135, reps: 8 },
+              { weight: 135, reps: 8 },
+              { weight: 135, reps: 8 },
+            ],
+          },
+        ],
+      },
+    ];
+    const suggestions = suggestWorkouts(workouts, { now: new Date("2026-08-24T12:00:00Z") });
+    assert.equal(suggestions.length, 1);
+    assert.equal(suggestions[0].kind, "personalized");
+    assert.ok(suggestions[0].exercises.length >= 4);
+    assert.ok(!suggestions[0].exercises.some((ex) => ex.name === "Bench Press"));
+  });
+
+  test("sessions older than the lookback window still get the three templates", () => {
+    const workouts = [
+      {
+        id: "old",
+        completedAt: "2026-08-01T12:00:00Z",
+        exercises: [{ name: "Squat", sets: [{ weight: 185, reps: 5 }] }],
+      },
+    ];
+    const now = new Date("2026-08-24T12:00:00Z");
+    const ageDays = (now - new Date(workouts[0].completedAt)) / 86400000;
+    assert.ok(ageDays > LOOKBACK_DAYS);
+    const suggestions = suggestWorkouts(workouts, { now });
+    assert.equal(suggestions.length, 3);
+  });
+});
+
+describe("saved library hide / templates", () => {
+  const history = [
+    {
+      id: "w1",
+      name: "Push Day",
+      completedAt: "2026-08-20T12:00:00Z",
+      exercises: [{ name: "Bench Press", sets: [{ weight: 135, reps: 8 }] }],
+    },
+  ];
+
+  test("hiding a workout removes it from the library but not from the history array", () => {
+    const hidden = hideWorkoutFromLibrary([], "w1");
+    const listed = visibleLibraryItems(history, hidden, []);
+    assert.equal(listed.length, 0);
+    assert.equal(history.length, 1);
+    assert.equal(computePersonalRecords(history)["Bench Press"].weight, 135);
+  });
+
+  test("saving a suggestion adds a template that can be removed without touching history", () => {
+    const suggestion = {
+      name: "Full body",
+      exercises: [{ name: "Push-ups", setCount: 3 }],
+    };
+    const templates = saveSuggestionTemplate([], suggestion, new Date("2026-08-24T12:00:00Z"));
+    assert.equal(templates.length, 1);
+    assert.equal(templates[0].name, "Full body");
+    assert.equal(templates[0].exercises[0].sets.length, 3);
+    const listed = visibleLibraryItems(history, [], templates);
+    assert.equal(listed[0].kind, "template");
+    assert.equal(visibleLibraryItems(history, [], removeTemplate(templates, templates[0].id)).length, 1);
+  });
+});
+
+describe("storage extras", () => {
+  test("serializeState keeps hidden ids, templates, and rest settings", () => {
+    const parsed = parseStoredState(
+      serializeState({
+        workouts: [{ id: "1", name: "Push", exercises: [] }],
+        hiddenIds: ["1"],
+        templates: [{ id: "t1", name: "Upper", exercises: [] }],
+        settings: { restSeconds: 120, equipmentIds: ["dumbbell"] },
+      })
+    );
+    assert.deepEqual(parsed.hiddenIds, ["1"]);
+    assert.equal(parsed.templates[0].id, "t1");
+    assert.equal(parsed.settings.restSeconds, 120);
+    assert.deepEqual(parsed.settings.equipmentIds, ["dumbbell"]);
+  });
+
+  test("unknown rest values fall back to the 90s default", () => {
+    const parsed = parseStoredState(
+      JSON.stringify({ workouts: [], settings: { restSeconds: 45, equipmentIds: ["laser"] } })
+    );
+    assert.equal(parsed.settings.restSeconds, 90);
+    assert.deepEqual(parsed.settings.equipmentIds, defaultEquipmentIds());
   });
 });
