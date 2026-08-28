@@ -45,13 +45,19 @@
         </div>
 
         <div class="card">
+          <label class="label">Weight unit</label>
+          <div class="rest-presets" id="unit-presets" role="group" aria-label="Weight unit"></div>
+          <p class="card-help">History stays in pounds under the hood so old sessions keep their numbers. This only changes what you type and see.</p>
+        </div>
+
+        <div class="card">
           <label class="label">Rest between sets</label>
           <div class="rest-presets" id="rest-presets" role="group" aria-label="Default rest duration"></div>
           <label class="notify-toggle" for="notify-rest-toggle">
             <input type="checkbox" id="notify-rest-toggle" checked>
             Notify me when rest is over
           </label>
-          <p class="card-help">On Android (and installed iOS apps) this sends a system notification so you can start the next set even if the tracker is in the background. Allow notifications when prompted.</p>
+          <p class="card-help">When rest starts, a lock-screen notification shows the clock time you are up (browsers cannot tick a notification every second). If Android freezes the tab, opening the app catches the timer up — and swaps that notice for “Rest over” if time is already up.</p>
         </div>
 
         <div class="card">
@@ -92,6 +98,11 @@
 
       <div id="panel-history" class="tab-panel hidden" role="tabpanel" hidden>
         <div class="card">
+          <h2 class="card-title">This week</h2>
+          <p class="card-help">Logged sets in the last 7 days, by muscle.</p>
+          <ul class="volume-list" data-volume-list></ul>
+        </div>
+        <div class="card">
           <h2 class="card-title">Backup</h2>
           <p class="card-help">Download a JSON snapshot to move devices or keep a copy in Drive / iCloud. Import it here to restore.</p>
           <div class="backup-actions">
@@ -119,6 +130,12 @@
 
       <div id="panel-prs" class="tab-panel hidden" role="tabpanel" hidden>
         <div class="card">
+          <h2 class="card-title">This week</h2>
+          <p class="card-help">Logged sets in the last 7 days, by muscle.</p>
+          <ul class="volume-list" data-volume-list></ul>
+        </div>
+
+        <div class="card">
           <h2 class="card-title">Personal records</h2>
           <label for="pr-search" class="label">Look up an exercise</label>
           <div class="muscle-filters" id="pr-muscle-filters" role="toolbar" aria-label="Filter PRs by muscle"></div>
@@ -143,6 +160,7 @@
             <span class="timer-icon" aria-hidden="true">⏱</span>
             <span class="timer-title">Rest</span>
             <div class="timer-countdown" id="timer-display">1:30</div>
+            <div class="timer-end-hint" id="timer-end-hint"></div>
           </div>
           <button type="button" id="dismiss-timer-btn" class="btn-timer-dismiss" aria-label="Dismiss timer">✕</button>
         </div>

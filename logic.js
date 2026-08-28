@@ -11,6 +11,11 @@ export const LOOKBACK_DAYS = 7;
 export const RECOVERY_HOURS = 48;
 export const TIMER_ADJUST_SECONDS = 15;
 export const TIMER_MAX_SECONDS = 600;
+export const WEIGHT_UNITS = ["lb", "kg"];
+export const LB_PER_KG = 2.2046226218;
+export const TOP_REP_TARGET = 8;
+export const PROGRESSION_LB = 5;
+export const PROGRESSION_KG = 2.5;
 
 export const EQUIPMENT = [
   { id: "barbell", label: "Barbell" },
@@ -221,7 +226,12 @@ export function defaultSettings() {
     restSeconds: DEFAULT_REST_SECONDS,
     equipmentIds: defaultEquipmentIds(),
     notifyRest: true,
+    weightUnit: "lb",
   };
+}
+
+export function normalizeWeightUnit(value) {
+  return value === "kg" ? "kg" : "lb";
 }
 
 export function normalizeSettings(raw) {
@@ -236,7 +246,98 @@ export function normalizeSettings(raw) {
     restSeconds,
     equipmentIds: incoming.length ? [...new Set(incoming)] : defaults.equipmentIds,
     notifyRest: raw?.notifyRest !== false,
+    weightUnit: normalizeWeightUnit(raw?.weightUnit),
   };
+}
+
+export function roundToHalf(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return 0;
+  return Math.round(n * 2) / 2;
+}
+
+export function lbToKg(weightLb) {
+  return roundToHalf(Number(weightLb) / LB_PER_KG);
+}
+
+export function kgToLb(weightKg) {
+  return roundToHalf(Number(weightKg) * LB_PER_KG);
+}
+
+export function unitLabel(unit) {
+  return normalizeWeightUnit(unit) === "kg" ? "kg" : "lbs";
+}
+
+export function formatWeightNumber(weightLb, unit = "lb") {
+  if (!isPresent(weightLb)) return "";
+  const n = Number(weightLb);
+  if (!Number.isFinite(n)) return "";
+  const display = normalizeWeightUnit(unit) === "kg" ? lbToKg(n) : roundToHalf(n);
+  return String(display);
+}
+
+export function displayWeightFromLb(weightLb, unit = "lb") {
+  return formatWeightNumber(weightLb, unit);
+}
+
+export function weightLbFromDisplay(value, unit = "lb") {
+  if (!isPresent(value)) return null;
+  const n = Number(value);
+  if (!Number.isFinite(n)) return null;
+  return normalizeWeightUnit(unit) === "kg" ? kgToLb(n) : roundToHalf(n);
+}
+
+export function convertDisplayedWeight(value, fromUnit, toUnit) {
+  const from = normalizeWeightUnit(fromUnit);
+  const to = normalizeWeightUnit(toUnit);
+  if (from === to) return value;
+  if (!isPresent(value)) return value;
+  const n = parseFloat(value);
+  if (!Number.isFinite(n) || n < 0) return value;
+  const asLb = from === "kg" ? kgToLb(n) : roundToHalf(n);
+  return formatWeightNumber(asLb, to);
+}
+
+export function convertLiveExerciseWeights(exercises, fromUnit, toUnit) {
+  if (normalizeWeightUnit(fromUnit) === normalizeWeightUnit(toUnit)) return exercises;
+  return (exercises || []).map((ex) => ({
+    ...ex,
+    sets: (ex.sets || []).map((set) => ({
+      ...set,
+      weight: convertDisplayedWeight(set.weight, fromUnit, toUnit),
+    })),
+  }));
+}
+
+export function parseRpe(value) {
+  if (!isPresent(value)) return null;
+  const n = Number(value);
+  if (!Number.isFinite(n) || n < 1 || n > 10) return null;
+  return roundToHalf(n);
+}
+
+/**
+ * Double progression: hit the top of the rep range, then add load.
+ * Hypertrophy-friendly default is 8 reps, then +5 lb / +2.5 kg.
+ */
+export function suggestProgression(previousWeightLb, previousReps, unit = "lb") {
+  const reps = Number(previousReps);
+  const weightLb = Number(previousWeightLb);
+  if (!Number.isFinite(weightLb) || weightLb <= 0 || !Number.isFinite(reps) || reps <= 0) {
+    return null;
+  }
+  if (reps >= TOP_REP_TARGET) {
+    const nextLb = normalizeWeightUnit(unit) === "kg"
+      ? kgToLb(roundToHalf(lbToKg(weightLb) + PROGRESSION_KG))
+      : roundToHalf(weightLb + PROGRESSION_LB);
+    return { weightLb: nextLb, reps, bumped: "weight" };
+  }
+  return { weightLb, reps: reps + 1, bumped: "reps" };
+}
+
+export function formatProgressionHint(suggestion, unit = "lb") {
+  if (!suggestion) return "";
+  return `Try ${formatLoad(suggestion.weightLb, suggestion.reps, unit)}`;
 }
 
 export function hasAllEquipment(equipmentIds) {
@@ -718,6 +819,32 @@ export function restNotificationPayload(exercises, exerciseIndex, setIndex) {
   };
 }
 
+export function remainingSeconds(endsAt, now = Date.now()) {
+  if (!endsAt) return 0;
+  return Math.max(0, Math.round((Number(endsAt) - Number(now)) / 1000));
+}
+
+export function restEndClockLabel(endsAt) {
+  const d = new Date(endsAt);
+  if (Number.isNaN(d.getTime())) return "";
+  let hours = d.getHours();
+  const minutes = d.getMinutes();
+  const ampm = hours >= 12 ? "PM" : "AM";
+  hours = hours % 12 || 12;
+  return `${hours}:${String(minutes).padStart(2, "0")} ${ampm}`;
+}
+
+export function restStartNotificationPayload(endsAt) {
+  const clock = restEndClockLabel(endsAt);
+  return {
+    title: "Resting",
+    body: clock
+      ? `Up at ${clock}. This stays on the lock screen if the app sleeps.`
+      : "Rest timer running.",
+    silent: true,
+  };
+}
+
 /** Compact lineup for suggestion cards: "Squat + Bench Press · Row". */
 export function formatExerciseLineup(exercises) {
   return groupedWorkoutItems(exercises)
@@ -772,6 +899,15 @@ export function muscleTrainingStats(workouts, now = new Date(), exercises = EXER
     }
   }
   return stats;
+}
+
+export function weeklyVolumeRows(workouts, now = new Date(), exercises = EXERCISES) {
+  const stats = muscleTrainingStats(workouts, now, exercises);
+  return MUSCLE_GROUPS.map((group) => ({
+    id: group.id,
+    label: group.label,
+    sets: stats[group.id]?.weeklySets || 0,
+  })).filter((row) => row.sets > 0);
 }
 
 function muscleNeedScore(stat, now) {
@@ -952,12 +1088,14 @@ export function createEmptySet(previous) {
   return {
     weight: "",
     reps: "",
+    rpe: "",
     completed: false,
     source: null,
     weightSource: null,
     repsSource: null,
     previousWeight: previous?.weight ?? null,
     previousReps: previous?.reps ?? null,
+    previousRpe: previous?.rpe ?? null,
   };
 }
 
@@ -969,7 +1107,13 @@ export function createEmptySet(previous) {
 export function createExercise(name, setCount = SETS_PER_EXERCISE, previousSets = null, extra = {}) {
   const count = Math.max(1, setCount);
   const sets = Array.from({ length: count }, (_, i) => createEmptySet(previousSets?.[i]));
-  return { name, sets, previousSets: previousSets || null, supersetId: extra.supersetId ?? null };
+  return {
+    name,
+    sets,
+    previousSets: previousSets || null,
+    supersetId: extra.supersetId ?? null,
+    note: extra.note || "",
+  };
 }
 
 /**
@@ -1011,14 +1155,16 @@ export function handleSetCompletion(setData) {
  * @param {Array<{ name: string, sets: Array<{ weight: string|number, reps: string|number }> }>} selectedExercises
  * @returns {Array<{ name: string, sets: Array<{ set: number, weight: number|null, reps: number|null }> }>}
  */
-export function collectWorkoutData(selectedExercises) {
+export function collectWorkoutData(selectedExercises, unit = "lb") {
   return selectedExercises.map((item) => {
     const sets = item.sets.map((s, idx) => ({
       set: idx + 1,
-      weight: isPresent(s.weight) ? Number(s.weight) : null,
+      weight: weightLbFromDisplay(s.weight, unit),
       reps: isPresent(s.reps) ? Number(s.reps) : null,
+      rpe: parseRpe(s.rpe),
     }));
-    return { name: item.name, sets, supersetId: item.supersetId ?? null };
+    const note = typeof item.note === "string" ? item.note.trim() : "";
+    return { name: item.name, sets, supersetId: item.supersetId ?? null, note };
   });
 }
 
@@ -1117,6 +1263,7 @@ export function getPreviousSets(workouts, exerciseName) {
       return match.sets.map((s) => ({
         weight: isPresent(s.weight) ? Number(s.weight) : null,
         reps: isPresent(s.reps) ? Number(s.reps) : null,
+        rpe: parseRpe(s.rpe),
       }));
     }
   }
@@ -1135,6 +1282,7 @@ export function attachPreviousSets(exercises, workouts) {
       ...set,
       previousWeight: previousSets?.[i]?.weight ?? null,
       previousReps: previousSets?.[i]?.reps ?? null,
+      previousRpe: previousSets?.[i]?.rpe ?? null,
     }));
     return { ...ex, sets, previousSets };
   });
@@ -1166,10 +1314,10 @@ function syncSetSource(setData) {
  * Copy previous weight/reps into the live fields and mark source as "previous".
  * @returns {boolean} whether the set newly completed (start rest timer)
  */
-export function applyPreviousSet(setData) {
+export function applyPreviousSet(setData, unit = "lb") {
   if (!hasPreviousSet(setData)) return false;
   if (isPresent(setData.previousWeight)) {
-    setData.weight = String(setData.previousWeight);
+    setData.weight = displayWeightFromLb(setData.previousWeight, unit);
     setData.weightSource = "previous";
   } else {
     setData.weight = "";
@@ -1192,6 +1340,7 @@ export function applyPreviousSet(setData) {
  */
 export function updateSetField(setData, field, value) {
   setData[field] = value;
+  if (field !== "weight" && field !== "reps") return false;
   const sourceField = field === "weight" ? "weightSource" : "repsSource";
   setData[sourceField] = value === "" ? null : "typed";
   syncSetSource(setData);
@@ -1379,8 +1528,8 @@ export function queryPersonalRecords(records, query = "") {
 /**
  * Format a weight × reps pair for display.
  */
-export function formatLoad(weight, reps) {
-  const w = isPresent(weight) ? `${weight} lbs` : "—";
+export function formatLoad(weightLb, reps, unit = "lb") {
+  const w = isPresent(weightLb) ? `${formatWeightNumber(weightLb, unit)} ${unitLabel(unit)}` : "—";
   const r = isPresent(reps) ? `${reps} reps` : "—";
   return `${w} × ${r}`;
 }

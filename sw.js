@@ -1,4 +1,4 @@
-const CACHE = "workout-tracker-v5";
+const CACHE = "workout-tracker-v6";
 const ASSETS = [
   "./",
   "./index.html",
@@ -46,15 +46,17 @@ self.addEventListener("fetch", (event) => {
 
 self.addEventListener("message", (event) => {
   const data = event.data;
-  if (!data || data.type !== "REST_DONE") return;
+  if (!data || (data.type !== "REST_DONE" && data.type !== "REST_START")) return;
+  const silent = data.type === "REST_START" || data.silent;
   event.waitUntil(
-    self.registration.showNotification(data.title || "Rest over", {
-      body: data.body || "Time for your next set.",
+    self.registration.showNotification(data.title || (silent ? "Resting" : "Rest over"), {
+      body: data.body || (silent ? "Rest timer running." : "Time for your next set."),
       icon: "./icons/icon-192.png",
       badge: "./icons/icon-192.png",
       tag: "rest-timer",
-      renotify: true,
-      vibrate: [180, 80, 180],
+      silent,
+      renotify: !silent,
+      vibrate: silent ? [] : [180, 80, 180],
       data: { url: "./" },
     })
   );

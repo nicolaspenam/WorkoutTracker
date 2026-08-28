@@ -87,6 +87,27 @@ import {
   removeTemplate,
   hideWorkoutFromLibrary,
   visibleLibraryItems,
+  normalizeWeightUnit,
+  normalizeSettings,
+  roundToHalf,
+  lbToKg,
+  kgToLb,
+  unitLabel,
+  formatWeightNumber,
+  displayWeightFromLb,
+  weightLbFromDisplay,
+  convertDisplayedWeight,
+  convertLiveExerciseWeights,
+  parseRpe,
+  suggestProgression,
+  formatProgressionHint,
+  weeklyVolumeRows,
+  remainingSeconds,
+  restEndClockLabel,
+  restStartNotificationPayload,
+  TOP_REP_TARGET,
+  PROGRESSION_LB,
+  PROGRESSION_KG,
 } from "./logic.js";
 import { EXERCISE_GUIDES, getExerciseGuide, isGuideComplete } from "./guides.js";
 
@@ -214,6 +235,20 @@ describe("collectWorkoutData", () => {
   test("returns an empty array for no exercises", () => {
     assert.deepEqual(collectWorkoutData([]), []);
   });
+
+  test("stores live kg inputs as pounds and keeps optional RPE and notes", () => {
+    const exercises = [
+      {
+        name: "Squat",
+        note: " belt ",
+        sets: [{ weight: "80", reps: "5", rpe: "8.5" }],
+      },
+    ];
+    const [ex] = collectWorkoutData(exercises, "kg");
+    assert.equal(ex.sets[0].weight, kgToLb(80));
+    assert.equal(ex.sets[0].rpe, 8.5);
+    assert.equal(ex.note, "belt");
+  });
 });
 
 // ─── summarize / names ────────────────────────────────────────────────────────
@@ -313,14 +348,14 @@ describe("previous sets", () => {
   test("getPreviousSets returns the most recent logged sets for an exercise", () => {
     const prev = getPreviousSets(history, "Bench Press");
     assert.equal(prev.length, 3);
-    assert.deepEqual(prev[0], { weight: 185, reps: 5 });
-    assert.deepEqual(prev[2], { weight: 175, reps: 6 });
+    assert.deepEqual(prev[0], { weight: 185, reps: 5, rpe: null });
+    assert.deepEqual(prev[2], { weight: 175, reps: 6, rpe: null });
   });
 
   test("getPreviousSets skips workouts that did not include the exercise", () => {
     const prev = getPreviousSets(history, "Squat");
     assert.equal(prev.length, 1);
-    assert.deepEqual(prev[0], { weight: 225, reps: 5 });
+    assert.deepEqual(prev[0], { weight: 225, reps: 5, rpe: null });
   });
 
   test("getPreviousSets returns null when the exercise has never been logged", () => {
@@ -1319,6 +1354,19 @@ describe("storage extras", () => {
     assert.equal(parsed.settings.restSeconds, 120);
     assert.deepEqual(parsed.settings.equipmentIds, ["dumbbell"]);
     assert.equal(parsed.settings.notifyRest, true);
+    assert.equal(parsed.settings.weightUnit, "lb");
+  });
+
+  test("weightUnit persists and unknown values fall back to lb", () => {
+    const parsed = parseStoredState(
+      serializeState({
+        workouts: [],
+        settings: { restSeconds: 90, equipmentIds: ["dumbbell"], weightUnit: "kg" },
+      })
+    );
+    assert.equal(parsed.settings.weightUnit, "kg");
+    const legacy = parseStoredState(JSON.stringify({ workouts: [], settings: { restSeconds: 90 } }));
+    assert.equal(legacy.settings.weightUnit, "lb");
   });
 
   test("notifyRest can be turned off and missing values default on", () => {
@@ -1363,5 +1411,162 @@ describe("exercise form guides", () => {
     assert.match(guide.summary, /chest/i);
     assert.ok(guide.steps.some((step) => /45|tuck|elbow/i.test(step)));
     assert.ok(guide.mistakes.some((item) => /bounc/i.test(item)));
+  });
+});
+
+describe("weight units", () => {
+  test("defaults to pounds and accepts kg", () => {
+    assert.equal(normalizeWeightUnit("kg"), "kg");
+    assert.equal(normalizeWeightUnit("lb"), "lb");
+    assert.equal(normalizeWeightUnit("stones"), "lb");
+    assert.equal(normalizeSettings({}).weightUnit, "lb");
+    assert.equal(normalizeSettings({ weightUnit: "kg" }).weightUnit, "kg");
+  });
+
+  test("round-trips common gym loads through kg", () => {
+    assert.equal(roundToHalf(83.9), 84);
+    assert.equal(lbToKg(185), 84);
+    assert.equal(kgToLb(80), 176.5);
+    assert.equal(lbToKg(kgToLb(80)), 80);
+    assert.equal(kgToLb(lbToKg(185)), 185);
+    assert.equal(unitLabel("kg"), "kg");
+    assert.equal(unitLabel("lb"), "lbs");
+    assert.equal(formatWeightNumber(185, "lb"), "185");
+    assert.equal(formatWeightNumber(185, "kg"), "84");
+    assert.equal(displayWeightFromLb(135, "kg"), "61");
+    assert.equal(weightLbFromDisplay("80", "kg"), 176.5);
+    assert.equal(weightLbFromDisplay("185", "lb"), 185);
+  });
+
+  test("converts a live typed weight when switching units", () => {
+    assert.equal(convertDisplayedWeight("185", "lb", "kg"), "84");
+    assert.equal(convertDisplayedWeight("80", "kg", "lb"), "176.5");
+    assert.equal(convertDisplayedWeight("", "lb", "kg"), "");
+    const [ex] = convertLiveExerciseWeights(
+      [{ name: "Squat", sets: [{ weight: "185", reps: "5" }] }],
+      "lb",
+      "kg"
+    );
+    assert.equal(ex.sets[0].weight, "84");
+    assert.equal(ex.sets[0].reps, "5");
+  });
+
+  test("formatLoad can show kilograms without changing stored pounds", () => {
+    assert.equal(formatLoad(185, 5), "185 lbs × 5 reps");
+    assert.equal(formatLoad(185, 5, "kg"), "84 kg × 5 reps");
+  });
+
+  test("applyPreviousSet converts previous pounds into the live unit", () => {
+    const set = createEmptySet({ weight: 135, reps: 8 });
+    applyPreviousSet(set, "kg");
+    assert.equal(set.weight, "61");
+    assert.equal(set.reps, "8");
+    assert.equal(set.source, "previous");
+  });
+});
+
+describe("progression hints", () => {
+  test("adds a small load bump after hitting the top of the rep range", () => {
+    const next = suggestProgression(185, TOP_REP_TARGET, "lb");
+    assert.equal(next.bumped, "weight");
+    assert.equal(next.weightLb, 185 + PROGRESSION_LB);
+    assert.equal(next.reps, 8);
+    assert.equal(formatProgressionHint(next, "lb"), "Try 190 lbs × 8 reps");
+  });
+
+  test("adds a rep when last time was under the top of the range", () => {
+    const next = suggestProgression(185, 6, "lb");
+    assert.equal(next.bumped, "reps");
+    assert.equal(next.weightLb, 185);
+    assert.equal(next.reps, 7);
+  });
+
+  test("bumps 2.5 kg when the display unit is kilograms", () => {
+    const next = suggestProgression(kgToLb(80), 8, "kg");
+    assert.equal(next.bumped, "weight");
+    assert.equal(lbToKg(next.weightLb), 80 + PROGRESSION_KG);
+    assert.match(formatProgressionHint(next, "kg"), /82\.5 kg × 8 reps/);
+  });
+
+  test("returns null without a previous load", () => {
+    assert.equal(suggestProgression(null, 8, "lb"), null);
+    assert.equal(formatProgressionHint(null), "");
+  });
+});
+
+describe("weekly volume", () => {
+  test("counts logged sets per muscle in the last 7 days", () => {
+    const now = new Date("2026-08-28T12:00:00Z");
+    const rows = weeklyVolumeRows(
+      [
+        {
+          completedAt: "2026-08-27T12:00:00Z",
+          exercises: [
+            { name: "Bench Press", sets: [{ weight: 185, reps: 5 }, { weight: 185, reps: 5 }] },
+            { name: "Squat", sets: [{ weight: 225, reps: 5 }] },
+          ],
+        },
+        {
+          completedAt: "2026-08-01T12:00:00Z",
+          exercises: [{ name: "Deadlift", sets: [{ weight: 315, reps: 3 }] }],
+        },
+      ],
+      now
+    );
+    const byId = Object.fromEntries(rows.map((row) => [row.id, row.sets]));
+    assert.equal(byId.chest, 2);
+    assert.equal(byId.quads, 1);
+    assert.equal(byId.back, undefined);
+  });
+});
+
+describe("RPE parsing", () => {
+  test("accepts half steps inside 1–10 and rejects the rest", () => {
+    assert.equal(parseRpe("8.5"), 8.5);
+    assert.equal(parseRpe("8.7"), 8.5);
+    assert.equal(parseRpe(""), null);
+    assert.equal(parseRpe("0"), null);
+    assert.equal(parseRpe("11"), null);
+  });
+
+  test("getPreviousSets keeps last time's RPE as a hint", () => {
+    const prev = getPreviousSets(
+      [
+        {
+          exercises: [
+            { name: "Bench Press", sets: [{ weight: 185, reps: 5, rpe: 8 }] },
+          ],
+        },
+      ],
+      "Bench Press"
+    );
+    assert.equal(prev[0].rpe, 8);
+    const set = createEmptySet(prev[0]);
+    assert.equal(set.rpe, "");
+    assert.equal(set.previousRpe, 8);
+  });
+});
+
+describe("rest timer wall clock", () => {
+  test("remainingSeconds catches up after a freeze and never goes negative", () => {
+    assert.equal(remainingSeconds(10_000, 1_000), 9);
+    assert.equal(remainingSeconds(10_000, 10_000), 0);
+    assert.equal(remainingSeconds(10_000, 15_000), 0);
+    assert.equal(remainingSeconds(null, 1_000), 0);
+  });
+
+  test("restEndClockLabel uses local 12-hour time", () => {
+    const evening = new Date(2026, 7, 28, 20, 4, 0);
+    assert.equal(restEndClockLabel(evening.getTime()), "8:04 PM");
+    const midnight = new Date(2026, 7, 28, 0, 5, 0);
+    assert.equal(restEndClockLabel(midnight.getTime()), "12:05 AM");
+  });
+
+  test("start notification names the clock time instead of ticking", () => {
+    const ends = new Date(2026, 7, 28, 8, 4, 0).getTime();
+    const payload = restStartNotificationPayload(ends);
+    assert.equal(payload.title, "Resting");
+    assert.match(payload.body, /Up at 8:04 AM/);
+    assert.equal(payload.silent, true);
   });
 });
