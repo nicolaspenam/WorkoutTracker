@@ -220,6 +220,7 @@ export function defaultSettings() {
   return {
     restSeconds: DEFAULT_REST_SECONDS,
     equipmentIds: defaultEquipmentIds(),
+    notifyRest: true,
   };
 }
 
@@ -234,6 +235,7 @@ export function normalizeSettings(raw) {
   return {
     restSeconds,
     equipmentIds: incoming.length ? [...new Set(incoming)] : defaults.equipmentIds,
+    notifyRest: raw?.notifyRest !== false,
   };
 }
 
@@ -386,6 +388,41 @@ const TEMPLATE_SLOTS = {
   ],
 };
 
+const SUPERSET_ROLE_PAIRS = {
+  // Alternating lower/upper compounds, then push/pull, then press + core.
+  // Antagonist and non-competing pairs keep load up while cutting rest time.
+  fullBody: [
+    ["squat", "hPush"],
+    ["hinge", "hPull"],
+    ["vPush", "core"],
+  ],
+  // Horizontal push/pull, vertical push/pull, then arm antagonists.
+  upper: [
+    ["hPush", "hPull"],
+    ["vPush", "vPull"],
+    ["biceps", "triceps"],
+  ],
+  // Knee + hip, single-leg + glute, curl + calves — little local overlap.
+  lower: [
+    ["squat", "hinge"],
+    ["unilateral", "glute"],
+    ["hamIso", "calves"],
+  ],
+};
+
+const ANTAGONIST_MUSCLES = {
+  chest: ["back"],
+  back: ["chest", "shoulders"],
+  shoulders: ["back"],
+  biceps: ["triceps"],
+  triceps: ["biceps"],
+  quads: ["hamstrings"],
+  hamstrings: ["quads"],
+  glutes: ["quads"],
+  calves: ["core"],
+  core: ["calves"],
+};
+
 const ROLE_MUSCLE = Object.fromEntries(Object.values(TEMPLATE_SLOTS).flat());
 
 const MUSCLE_PRIORITY = {
@@ -451,9 +488,195 @@ export function buildSplitWorkout(kind, equipmentIds, exercises = EXERCISES) {
     const ex = pickExerciseForRole(role, equipmentIds, used, exercises, muscle);
     if (!ex) continue;
     used.add(ex.name);
-    picked.push({ name: ex.name, setCount: SETS_PER_EXERCISE });
+    picked.push({ name: ex.name, setCount: SETS_PER_EXERCISE, role });
   }
-  return picked;
+  return applyRoleSupersets(picked, SUPERSET_ROLE_PAIRS[kind] || []);
+}
+
+export function applyRoleSupersets(items, pairs) {
+  const next = (items || []).map((item) => ({ ...item, supersetId: item.supersetId ?? null }));
+  const indexByRole = new Map();
+  next.forEach((item, i) => {
+    if (item.role) indexByRole.set(item.role, i);
+  });
+  let n = 1;
+  for (const [a, b] of pairs || []) {
+    const i = indexByRole.get(a);
+    const j = indexByRole.get(b);
+    if (i == null || j == null) continue;
+    const id = `ss-${n++}`;
+    next[i] = { ...next[i], supersetId: id };
+    next[j] = { ...next[j], supersetId: id };
+  }
+  return next.map(({ role, ...rest }) => rest);
+}
+
+export function pairAntagonistSupersets(items, catalog = EXERCISES) {
+  const list = (items || []).map((item) => ({
+    ...item,
+    muscle: getMuscleForExercise(item.name, catalog),
+    supersetId: null,
+  }));
+  const used = new Set();
+  const ordered = [];
+  let n = 1;
+  for (let i = 0; i < list.length; i++) {
+    if (used.has(i)) continue;
+    const partners = ANTAGONIST_MUSCLES[list[i].muscle] || [];
+    let found = -1;
+    for (let j = i + 1; j < list.length; j++) {
+      if (used.has(j)) continue;
+      if (partners.includes(list[j].muscle)) {
+        found = j;
+        break;
+      }
+    }
+    const id = found >= 0 ? `ss-${n++}` : null;
+    ordered.push({ ...list[i], supersetId: id });
+    used.add(i);
+    if (found >= 0) {
+      ordered.push({ ...list[found], supersetId: id });
+      used.add(found);
+    }
+  }
+  return ordered.map(({ muscle, ...rest }) => rest);
+}
+
+export function findSupersetPartnerIndex(exercises, index) {
+  const id = exercises?.[index]?.supersetId;
+  if (!id) return null;
+  if (index > 0 && exercises[index - 1]?.supersetId === id) return index - 1;
+  if (index < (exercises?.length || 0) - 1 && exercises[index + 1]?.supersetId === id) return index + 1;
+  return null;
+}
+
+export function groupedWorkoutItems(exercises) {
+  const list = exercises || [];
+  const groups = [];
+  for (let i = 0; i < list.length; i++) {
+    const partner = findSupersetPartnerIndex(list, i);
+    if (partner === i + 1) {
+      groups.push({ kind: "superset", indices: [i, i + 1], exercises: [list[i], list[i + 1]] });
+      i += 1;
+    } else {
+      groups.push({ kind: "single", indices: [i], exercises: [list[i]] });
+    }
+  }
+  return groups;
+}
+
+export function togglePairWithNext(exercises, index) {
+  const list = (exercises || []).map((ex) => ({ ...ex }));
+  if (index < 0 || index >= list.length - 1) return list;
+  const a = list[index];
+  const b = list[index + 1];
+  if (a.supersetId && a.supersetId === b.supersetId) {
+    a.supersetId = null;
+    b.supersetId = null;
+    return list;
+  }
+  const stale = new Set([a.supersetId, b.supersetId].filter(Boolean));
+  if (stale.size) {
+    for (const ex of list) {
+      if (stale.has(ex.supersetId)) ex.supersetId = null;
+    }
+  }
+  const id = `ss-${createId().replace(/-/g, "").slice(0, 8)}`;
+  list[index].supersetId = id;
+  list[index + 1].supersetId = id;
+  return list;
+}
+
+export function moveExercise(exercises, from, delta) {
+  const list = (exercises || []).slice();
+  const to = from + delta;
+  if (from < 0 || to < 0 || from >= list.length || to >= list.length) return list;
+  const [item] = list.splice(from, 1);
+  list.splice(to, 0, item);
+  return normalizeSupersetAdjacency(list);
+}
+
+export function normalizeSupersetAdjacency(exercises) {
+  const list = (exercises || []).map((ex) => ({ ...ex }));
+  const counts = new Map();
+  for (const ex of list) {
+    if (!ex.supersetId) continue;
+    counts.set(ex.supersetId, (counts.get(ex.supersetId) || 0) + 1);
+  }
+  for (let i = 0; i < list.length; i++) {
+    const id = list[i].supersetId;
+    if (!id) continue;
+    const adjacent =
+      (i > 0 && list[i - 1].supersetId === id) ||
+      (i < list.length - 1 && list[i + 1].supersetId === id);
+    if (!adjacent || counts.get(id) !== 2) list[i].supersetId = null;
+  }
+  return list;
+}
+
+/**
+ * Rest starts after a completed set, unless this lift is in a superset —
+ * then both partners must finish that set number first.
+ */
+export function shouldStartRestTimer(exercises, exerciseIndex, setIndex) {
+  const current = exercises?.[exerciseIndex]?.sets?.[setIndex];
+  if (!current?.completed) return false;
+  const partner = findSupersetPartnerIndex(exercises, exerciseIndex);
+  if (partner == null) return true;
+  const partnerSet = exercises[partner]?.sets?.[setIndex];
+  if (!partnerSet) return true;
+  return !!partnerSet.completed;
+}
+
+export function restNotificationPayload(exercises, exerciseIndex, setIndex) {
+  const current = exercises?.[exerciseIndex];
+  const partnerIndex = findSupersetPartnerIndex(exercises, exerciseIndex);
+  const partner = partnerIndex != null ? exercises[partnerIndex] : null;
+  const nextNum = (setIndex ?? 0) + 2;
+  const hasNext =
+    (current?.sets?.length || 0) > (setIndex ?? 0) + 1 ||
+    (partner?.sets?.length || 0) > (setIndex ?? 0) + 1;
+  if (partner) {
+    const first = partnerIndex < exerciseIndex ? partner : current;
+    const second = partnerIndex < exerciseIndex ? current : partner;
+    return {
+      title: "Rest over",
+      body: hasNext
+        ? `Next round: ${first.name} + ${second.name}.`
+        : `${first.name} + ${second.name} is done. On to the next work.`,
+    };
+  }
+  return {
+    title: "Rest over",
+    body: hasNext
+      ? `Time for ${current?.name || "your next set"}, set ${nextNum}.`
+      : `Time for your next exercise.`,
+  };
+}
+
+/** Compact lineup for suggestion cards: "Squat + Bench Press · Row". */
+export function formatExerciseLineup(exercises) {
+  return groupedWorkoutItems(exercises)
+    .map((group) => {
+      if (group.kind === "superset") {
+        return `${group.exercises[0].name} + ${group.exercises[1].name}`;
+      }
+      return group.exercises[0]?.name || "";
+    })
+    .filter(Boolean)
+    .join(" · ");
+}
+
+/**
+ * Whether to skip, request, or show rest notifications.
+ * @param {NotificationPermission | string | undefined} permission
+ * @param {boolean} notifyEnabled
+ */
+export function notificationPermissionAction(permission, notifyEnabled) {
+  if (!notifyEnabled) return "skip";
+  if (permission === "granted") return "notify";
+  if (permission === "denied") return "blocked";
+  return "request";
 }
 
 function hoursBetween(iso, now) {
@@ -541,7 +764,7 @@ export function buildPersonalizedWorkout(workouts, equipmentIds, now = new Date(
     reason: labels
       ? `Hypertrophy work is more effective at ~10–20 sets/muscle/week, trained ~2×/week, with ~48h between hard sessions. Right now ${labels} look most under-trained.`
       : "Hypertrophy work is more effective when each muscle is trained about twice a week. This session spreads compounds across lagging groups.",
-    exercises: picked,
+    exercises: pairAntagonistSupersets(picked, exercises),
   };
 }
 
@@ -566,17 +789,17 @@ export function suggestWorkouts(workouts, { equipmentIds, now = new Date(), exer
       pack(
         "fullBody",
         "Full body",
-        "No sessions in the last week. A full-body workout trains each muscle once — a reliable hypertrophy default until you have more history."
+        "No sessions in the last week. A full-body workout trains each muscle once, with antagonist and upper/lower supersets so rest time drops without cutting load."
       ),
       pack(
         "upper",
         "Upper body",
-        "Push, pull, and arms. Pair with a lower-body day later in the week so each muscle can hit ~2 sessions."
+        "Push, pull, and arms as antagonist supersets. Pair with a lower-body day later in the week so each muscle can hit ~2 sessions."
       ),
       pack(
         "lower",
         "Lower body",
-        "Squat, hinge, and unilateral work. Frequency of 2x/week per muscle beats cramming all sets into one day."
+        "Squat/hinge, single-leg/glute, and curl/calf supersets. Frequency of 2x/week per muscle beats cramming all sets into one day."
       ),
     ].filter((item) => item.exercises.length > 0);
   }
@@ -589,7 +812,12 @@ export function suggestWorkouts(workouts, { equipmentIds, now = new Date(), exer
 
 export function exercisesFromSuggestion(suggestion, workouts = []) {
   return (suggestion?.exercises || []).map((item) =>
-    createExercise(item.name, item.setCount || SETS_PER_EXERCISE, getPreviousSets(workouts, item.name))
+    createExercise(
+      item.name,
+      item.setCount || SETS_PER_EXERCISE,
+      getPreviousSets(workouts, item.name),
+      { supersetId: item.supersetId ?? null }
+    )
   );
 }
 
@@ -611,6 +839,7 @@ export function hideWorkoutFromLibrary(hiddenIds, id) {
 export function saveSuggestionTemplate(templates, suggestion, now = new Date()) {
   const exercises = (suggestion?.exercises || []).map((item) => ({
     name: item.name,
+    supersetId: item.supersetId ?? null,
     sets: Array.from({ length: item.setCount || SETS_PER_EXERCISE }, () => ({
       weight: null,
       reps: null,
@@ -673,10 +902,10 @@ export function createEmptySet(previous) {
  * @param {number} [setCount]
  * @param {Array<{ weight: number|null, reps: number|null }> | null} [previousSets]
  */
-export function createExercise(name, setCount = SETS_PER_EXERCISE, previousSets = null) {
+export function createExercise(name, setCount = SETS_PER_EXERCISE, previousSets = null, extra = {}) {
   const count = Math.max(1, setCount);
   const sets = Array.from({ length: count }, (_, i) => createEmptySet(previousSets?.[i]));
-  return { name, sets, previousSets: previousSets || null };
+  return { name, sets, previousSets: previousSets || null, supersetId: extra.supersetId ?? null };
 }
 
 /**
@@ -725,7 +954,7 @@ export function collectWorkoutData(selectedExercises) {
       weight: isPresent(s.weight) ? Number(s.weight) : null,
       reps: isPresent(s.reps) ? Number(s.reps) : null,
     }));
-    return { name: item.name, sets };
+    return { name: item.name, sets, supersetId: item.supersetId ?? null };
   });
 }
 
@@ -736,10 +965,20 @@ export function summarizeExercises(exercises) {
   const list = exercises || [];
   const exerciseCount = list.length;
   const setCount = list.reduce((n, ex) => n + (ex.sets?.length || 0), 0);
-  const parts = list.map((ex) => {
+  const parts = [];
+  for (let i = 0; i < list.length; i++) {
+    const ex = list[i];
     const n = ex.sets?.length || 0;
-    return `${ex.name} · ${n} set${n !== 1 ? "s" : ""}`;
-  });
+    const partner = findSupersetPartnerIndex(list, i);
+    if (partner === i + 1) {
+      const other = list[i + 1];
+      const n2 = other.sets?.length || 0;
+      parts.push(`${ex.name} + ${other.name} · ${n}/${n2} sets`);
+      i += 1;
+    } else {
+      parts.push(`${ex.name} · ${n} set${n !== 1 ? "s" : ""}`);
+    }
+  }
   return {
     exerciseCount,
     setCount,
@@ -933,7 +1172,9 @@ export function removeSet(exercise) {
 export function workoutToExercises(savedWorkout, allWorkouts) {
   const source = savedWorkout?.routine || savedWorkout?.exercises || [];
   const exercises = source.map((ex) =>
-    createExercise(ex.name, Math.max(1, ex.sets?.length || SETS_PER_EXERCISE), null)
+    createExercise(ex.name, Math.max(1, ex.sets?.length || SETS_PER_EXERCISE), null, {
+      supersetId: ex.supersetId ?? null,
+    })
   );
   return attachPreviousSets(exercises, allWorkouts);
 }
@@ -942,17 +1183,24 @@ export function exerciseStructure(exercises) {
   return (exercises || []).map((ex) => ({
     name: ex.name,
     setCount: Math.max(1, ex.sets?.length || SETS_PER_EXERCISE),
+    supersetId: ex.supersetId ?? null,
   }));
 }
 
 export function structuresEqual(a, b) {
   if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) return false;
-  return a.every((item, i) => item?.name === b[i]?.name && item?.setCount === b[i]?.setCount);
+  return a.every(
+    (item, i) =>
+      item?.name === b[i]?.name &&
+      item?.setCount === b[i]?.setCount &&
+      (item?.supersetId || null) === (b[i]?.supersetId || null)
+  );
 }
 
 export function toRoutineExercises(exercises) {
   return exerciseStructure(exercises).map((item) => ({
     name: item.name,
+    supersetId: item.supersetId ?? null,
     sets: Array.from({ length: item.setCount }, () => ({ weight: null, reps: null })),
   }));
 }
@@ -963,7 +1211,9 @@ export function swapExerciseAt(exercises, index, newName, previousSets = null) {
   if (list.some((ex, i) => i !== index && ex.name === newName)) return list.slice();
   const setCount = Math.max(1, list[index].sets?.length || SETS_PER_EXERCISE);
   const next = list.slice();
-  next[index] = createExercise(newName, setCount, previousSets);
+  next[index] = createExercise(newName, setCount, previousSets, {
+    supersetId: list[index].supersetId ?? null,
+  });
   return next;
 }
 

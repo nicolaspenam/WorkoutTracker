@@ -34,7 +34,7 @@
       <div id="panel-workout" class="tab-panel" role="tabpanel">
         <div class="card">
           <h2 class="card-title">Suggested for you</h2>
-          <p class="card-help" id="suggest-help">Based on recent training and the equipment you have.</p>
+          <p class="card-help" id="suggest-help">Based on recent training and the equipment you have. Suggested sessions include supersets by default.</p>
           <div id="suggestion-list" class="suggestion-list"></div>
         </div>
 
@@ -47,6 +47,11 @@
         <div class="card">
           <label class="label">Rest between sets</label>
           <div class="rest-presets" id="rest-presets" role="group" aria-label="Default rest duration"></div>
+          <label class="notify-toggle" for="notify-rest-toggle">
+            <input type="checkbox" id="notify-rest-toggle" checked>
+            Notify me when rest is over
+          </label>
+          <p class="card-help">On Android (and installed iOS apps) this sends a system notification so you can start the next set even if the tracker is in the background. Allow notifications when prompted.</p>
         </div>
 
         <div class="card">
@@ -74,6 +79,7 @@
 
         <div class="card">
           <h2 class="card-title">Your workout</h2>
+          <p class="card-help">Use <strong>Superset with next</strong> to pair two adjacent lifts. Rest starts after both finish that set.</p>
           <ul id="exercise-list" class="exercise-list">
             <li class="empty-state" id="empty-list-msg">No exercises added yet.</li>
           </ul>

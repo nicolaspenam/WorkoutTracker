@@ -1,4 +1,4 @@
-const CACHE = "workout-tracker-v1";
+const CACHE = "workout-tracker-v2";
 const ASSETS = [
   "./",
   "./index.html",
@@ -40,5 +40,34 @@ self.addEventListener("fetch", (event) => {
         return response;
       })
       .catch(() => caches.match(event.request).then((cached) => cached || caches.match("./index.html")))
+  );
+});
+
+self.addEventListener("message", (event) => {
+  const data = event.data;
+  if (!data || data.type !== "REST_DONE") return;
+  event.waitUntil(
+    self.registration.showNotification(data.title || "Rest over", {
+      body: data.body || "Time for your next set.",
+      icon: "./icons/icon-192.png",
+      badge: "./icons/icon-192.png",
+      tag: "rest-timer",
+      renotify: true,
+      vibrate: [180, 80, 180],
+      data: { url: "./" },
+    })
+  );
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clients) => {
+      for (const client of clients) {
+        if ("focus" in client) return client.focus();
+      }
+      if (self.clients.openWindow) return self.clients.openWindow("./");
+      return undefined;
+    })
   );
 });
