@@ -22,7 +22,7 @@ A simple, mobile-friendly workout tracker built with vanilla HTML, CSS, and Java
 - See last time’s weight/reps for each set and tap **✓** to copy them
 - Previous numbers stay in amber; values you type or confirm use a green style
 - Look up personal records (heaviest set, then most reps) from the **PRs** tab
-- Finish a workout to save it and view a summary
+- Finish a workout to save it and view a summary. You can stop early — only the sets you filled in are logged (volume, history, and PRs ignore empty leftovers)
 - Remove a workout from the saved list without deleting history or PRs
 - Save a suggestion to that list for later
 - **Export / import** a JSON backup from History to move devices or keep a snapshot off-browser

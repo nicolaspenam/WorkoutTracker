@@ -11,6 +11,7 @@ import {
   formatTime,
   handleSetCompletion,
   collectWorkoutData,
+  pruneUnloggedExercises,
   DEFAULT_REST_SECONDS,
   SETS_PER_EXERCISE,
   createEmptySet,
@@ -249,6 +250,36 @@ describe("collectWorkoutData", () => {
     assert.equal(ex.sets[0].rpe, 8.5);
     assert.equal(ex.note, "belt");
   });
+
+  test("pruneUnloggedExercises drops empty leftover sets and skipped lifts", () => {
+    const data = collectWorkoutData([
+      {
+        name: "Bench Press",
+        supersetId: "ss-1",
+        sets: [
+          { weight: "185", reps: "8" },
+          { weight: "", reps: "" },
+          { weight: "", reps: "" },
+        ],
+      },
+      {
+        name: "Squat",
+        supersetId: "ss-1",
+        sets: [
+          { weight: "", reps: "" },
+          { weight: "", reps: "" },
+          { weight: "", reps: "" },
+        ],
+      },
+    ]);
+    const pruned = pruneUnloggedExercises(data);
+    assert.equal(pruned.length, 1);
+    assert.equal(pruned[0].name, "Bench Press");
+    assert.equal(pruned[0].sets.length, 1);
+    assert.equal(pruned[0].sets[0].set, 1);
+    assert.equal(pruned[0].sets[0].weight, 185);
+    assert.equal(pruned[0].supersetId, null);
+  });
 });
 
 // ─── summarize / names ────────────────────────────────────────────────────────
@@ -280,6 +311,33 @@ describe("summarizeExercises", () => {
     const stats = summarizeExercises(exercises);
     assert.equal(stats.summary, "Squat + Bench Press · 3/3 sets · Row · 2 sets");
     assert.equal(formatExerciseLineup(exercises), "Squat + Bench Press · Row");
+  });
+
+  test("loggedOnly summary ignores planned sets that were never filled in", () => {
+    const stats = summarizeExercises(
+      [
+        {
+          name: "Bench Press",
+          sets: [
+            { weight: 185, reps: 8 },
+            { weight: null, reps: null },
+            { weight: null, reps: null },
+          ],
+        },
+        {
+          name: "Squat",
+          sets: [
+            { weight: null, reps: null },
+            { weight: null, reps: null },
+            { weight: null, reps: null },
+          ],
+        },
+      ],
+      { loggedOnly: true }
+    );
+    assert.equal(stats.exerciseCount, 1);
+    assert.equal(stats.setCount, 1);
+    assert.equal(stats.summary, "Bench Press · 1 set");
   });
 });
 
@@ -1517,6 +1575,39 @@ describe("weekly volume", () => {
     assert.equal(byId.chest, 2);
     assert.equal(byId.quads, 1);
     assert.equal(byId.back, undefined);
+  });
+
+  test("unlogged leftover sets and skipped exercises do not count as volume", () => {
+    const now = new Date("2026-08-28T12:00:00Z");
+    const rows = weeklyVolumeRows(
+      [
+        {
+          completedAt: "2026-08-27T12:00:00Z",
+          exercises: [
+            {
+              name: "Bench Press",
+              sets: [
+                { weight: 185, reps: 5 },
+                { weight: null, reps: null },
+                { weight: null, reps: null },
+              ],
+            },
+            {
+              name: "Squat",
+              sets: [
+                { weight: null, reps: null },
+                { weight: null, reps: null },
+                { weight: null, reps: null },
+              ],
+            },
+          ],
+        },
+      ],
+      now
+    );
+    const byId = Object.fromEntries(rows.map((row) => [row.id, row.sets]));
+    assert.equal(byId.chest, 1);
+    assert.equal(byId.quads, undefined);
   });
 });
 
