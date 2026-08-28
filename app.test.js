@@ -591,6 +591,15 @@ describe("exercise catalog / muscle filter", () => {
     }
   });
 
+  test("exercise names are unique", () => {
+    const names = EXERCISES.map((ex) => ex.name);
+    assert.equal(names.length, new Set(names).size);
+  });
+
+  test("unknown muscle id yields no exercises", () => {
+    assert.deepEqual(filterExercisesByMuscle(EXERCISES, "forearms"), []);
+  });
+
   test("filterExercisesByMuscle returns only that muscle, or all when unset", () => {
     const chest = filterExercisesByMuscle(EXERCISES, "chest");
     assert.ok(chest.length > 0);

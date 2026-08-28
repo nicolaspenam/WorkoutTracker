@@ -52,3 +52,5 @@ Then open the URL in your phone or browser.
 ```bash
 node app.test.js
 ```
+
+GitHub Actions runs the same command on every pull request and on `main`.
