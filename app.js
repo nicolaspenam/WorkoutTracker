@@ -60,17 +60,24 @@ import {
   normalizeSupersetAdjacency,
   shouldStartRestTimer,
   restNotificationPayload,
-  formatExerciseLineup,
   notificationPermissionAction,
   visibleLibraryItems,
   hideWorkoutFromLibrary,
   saveSuggestionTemplate,
   removeTemplate,
 } from "./logic.js";
+import { getExerciseGuide } from "./guides.js";
 
 const buildPhase = document.getElementById("build-phase");
 const trackPhase = document.getElementById("track-phase");
 const summaryPhase = document.getElementById("summary-phase");
+const guidePhase = document.getElementById("guide-phase");
+const guideBackBtn = document.getElementById("guide-back-btn");
+const guideMeta = document.getElementById("guide-meta");
+const guideTitle = document.getElementById("guide-title");
+const guideSummary = document.getElementById("guide-summary");
+const guideSteps = document.getElementById("guide-steps");
+const guideMistakes = document.getElementById("guide-mistakes");
 const phaseLabel = document.getElementById("phase-label");
 const exerciseSelect = document.getElementById("exercise-select");
 const addExerciseBtn = document.getElementById("add-exercise-btn");
@@ -143,6 +150,7 @@ let sourceLibrary = null;
 let swapIndex = null;
 let swapMuscleFilter = null;
 let pickerMode = "swap";
+let guideReturnPhase = "build";
 
 function loadWorkouts() {
   try {
@@ -640,9 +648,18 @@ function renderSuggestions() {
     const reason = document.createElement("p");
     reason.className = "suggestion-reason";
     reason.textContent = suggestion.reason;
-    const summary = document.createElement("p");
+    const summary = document.createElement("div");
     summary.className = "suggestion-summary";
-    summary.textContent = formatExerciseLineup(suggestion.exercises);
+    groupedWorkoutItems(suggestion.exercises).forEach((group, i) => {
+      if (i) summary.append(" · ");
+      if (group.kind === "superset") {
+        summary.appendChild(exerciseNameButton(group.exercises[0].name, { className: "exercise-link-inline" }));
+        summary.append(" + ");
+        summary.appendChild(exerciseNameButton(group.exercises[1].name, { className: "exercise-link-inline" }));
+      } else {
+        summary.appendChild(exerciseNameButton(group.exercises[0].name, { className: "exercise-link-inline" }));
+      }
+    });
     const actions = document.createElement("div");
     actions.className = "suggestion-actions";
     const useBtn = document.createElement("button");
@@ -674,14 +691,88 @@ function muscleCaption(name) {
   return muscleId ? getMuscleLabel(muscleId) : "";
 }
 
+function currentPhase() {
+  if (guidePhase && !guidePhase.classList.contains("hidden")) return "guide";
+  if (!trackPhase.classList.contains("hidden")) return "track";
+  if (!summaryPhase.classList.contains("hidden")) return "summary";
+  return "build";
+}
+
+function exerciseNameButton(name, { heading = false, className = "" } = {}) {
+  const guide = getExerciseGuide(name);
+  const el = document.createElement(guide ? "button" : "span");
+  el.className = ["exercise-link", heading ? "exercise-link-heading" : "", className].filter(Boolean).join(" ");
+  if (guide) {
+    el.type = "button";
+    el.setAttribute("aria-label", `${name}, form guide`);
+    el.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      openExerciseGuide(name);
+    });
+  }
+  const text = document.createElement("span");
+  text.textContent = name;
+  el.appendChild(text);
+  if (guide) {
+    const icon = document.createElement("span");
+    icon.className = "info-icon";
+    icon.setAttribute("aria-hidden", "true");
+    icon.textContent = "i";
+    el.appendChild(icon);
+  }
+  return el;
+}
+
+function openExerciseGuide(name) {
+  const guide = getExerciseGuide(name);
+  if (!guide || !guidePhase) return;
+  const from = currentPhase();
+  if (from !== "guide") guideReturnPhase = from;
+  const muscleId = getMuscleForExercise(name);
+  const catalog = EXERCISES.find((ex) => ex.name === name);
+  const gear = (catalog?.equipment || [])
+    .map((id) => EQUIPMENT.find((item) => item.id === id)?.label || id)
+    .join(", ");
+  guideTitle.textContent = name;
+  guideMeta.textContent = [getMuscleLabel(muscleId), gear].filter(Boolean).join(" · ");
+  guideSummary.textContent = guide.summary;
+  guideSteps.innerHTML = "";
+  guide.steps.forEach((step) => {
+    const li = document.createElement("li");
+    li.textContent = step;
+    guideSteps.appendChild(li);
+  });
+  guideMistakes.innerHTML = "";
+  guide.mistakes.forEach((item) => {
+    const li = document.createElement("li");
+    li.textContent = item;
+    guideMistakes.appendChild(li);
+  });
+  showPhase("guide");
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+function closeExerciseGuide() {
+  showPhase(guideReturnPhase || "build");
+}
+
 function builderNameEl(index) {
   const item = selectedExercises[index];
   const left = document.createElement("span");
   left.className = "name";
   const muscleName = muscleCaption(item.name);
-  left.innerHTML = `<span class="index">${index + 1}.</span>${item.name}${
-    muscleName ? `<span class="muscle">${muscleName}</span>` : ""
-  }`;
+  const indexEl = document.createElement("span");
+  indexEl.className = "index";
+  indexEl.textContent = `${index + 1}.`;
+  left.appendChild(indexEl);
+  left.appendChild(exerciseNameButton(item.name));
+  if (muscleName) {
+    const muscle = document.createElement("span");
+    muscle.className = "muscle";
+    muscle.textContent = muscleName;
+    left.appendChild(muscle);
+  }
   return left;
 }
 
@@ -962,6 +1053,7 @@ function showPhase(phase) {
   buildPhase.classList.add("hidden");
   trackPhase.classList.add("hidden");
   summaryPhase.classList.add("hidden");
+  guidePhase?.classList.add("hidden");
 
   if (phase === "build") {
     buildPhase.classList.remove("hidden");
@@ -972,6 +1064,9 @@ function showPhase(phase) {
   } else if (phase === "summary") {
     summaryPhase.classList.remove("hidden");
     phaseLabel.textContent = "Summary";
+  } else if (phase === "guide") {
+    guidePhase?.classList.remove("hidden");
+    phaseLabel.textContent = "Exercise guide";
   }
 }
 
@@ -1085,9 +1180,7 @@ function renderPersonalRecords() {
     li.className = "pr-item";
 
     const left = document.createElement("div");
-    const name = document.createElement("div");
-    name.className = "pr-name";
-    name.textContent = pr.name;
+    const name = exerciseNameButton(pr.name, { className: "pr-name" });
 
     const meta = document.createElement("div");
     meta.className = "pr-meta";
@@ -1140,9 +1233,9 @@ function renderExerciseBlock(item, exerciseIndex, prs) {
   header.className = "exercise-header";
 
   const titleWrap = document.createElement("div");
-  const title = document.createElement("h3");
-  title.textContent = item.name;
-  titleWrap.appendChild(title);
+    const title = document.createElement("h3");
+    title.appendChild(exerciseNameButton(item.name, { heading: true }));
+    titleWrap.appendChild(title);
 
   const pr = prs[item.name];
   if (pr) {
@@ -1469,7 +1562,7 @@ function renderSummary(workoutData) {
       const div = document.createElement("div");
       div.className = "summary-exercise";
       const heading = document.createElement("h4");
-      heading.textContent = exercise.name;
+      heading.appendChild(exerciseNameButton(exercise.name, { heading: true }));
       div.appendChild(heading);
       exercise.sets.forEach((set) => {
         const p = document.createElement("p");
@@ -1534,6 +1627,7 @@ function bindEvents() {
     if (e.key === "Enter") addExercise();
   });
   startWorkoutBtn.addEventListener("click", startWorkout);
+  guideBackBtn?.addEventListener("click", closeExerciseGuide);
   if (notifyRestToggle) {
     notifyRestToggle.addEventListener("change", () => {
       setNotifyRest(notifyRestToggle.checked);
@@ -1550,6 +1644,10 @@ function bindEvents() {
     if (e.target === swapModal) closeExercisePicker();
   });
   document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && guidePhase && !guidePhase.classList.contains("hidden")) {
+      closeExerciseGuide();
+      return;
+    }
     if (e.key === "Escape" && !swapModal.classList.contains("hidden")) {
       closeExercisePicker();
     }
