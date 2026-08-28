@@ -66,6 +66,23 @@ import {
   adjustTimerSeconds,
   suggestWorkouts,
   buildSplitWorkout,
+  applyRoleSupersets,
+  pairAntagonistSupersets,
+  findSupersetPartnerIndex,
+  groupedWorkoutItems,
+  togglePairWithNext,
+  moveExercise,
+  moveWorkoutBlock,
+  swapSupersetPartners,
+  dropWorkoutBlock,
+  dropTargetIndex,
+  dropPlaceFromOffset,
+  canPairWithNext,
+  normalizeSupersetAdjacency,
+  shouldStartRestTimer,
+  restNotificationPayload,
+  formatExerciseLineup,
+  notificationPermissionAction,
   saveSuggestionTemplate,
   removeTemplate,
   hideWorkoutFromLibrary,
@@ -183,6 +200,16 @@ describe("collectWorkoutData", () => {
     assert.equal(result[1].name, "OHP");
   });
 
+  test("keeps superset ids on saved sets", () => {
+    const exercises = [
+      { name: "Squat", supersetId: "ss-1", sets: [{ weight: "200", reps: "5" }] },
+      { name: "Bench Press", supersetId: "ss-1", sets: [{ weight: "135", reps: "8" }] },
+    ];
+    const result = collectWorkoutData(exercises);
+    assert.equal(result[0].supersetId, "ss-1");
+    assert.equal(result[1].supersetId, "ss-1");
+  });
+
   test("returns an empty array for no exercises", () => {
     assert.deepEqual(collectWorkoutData([]), []);
   });
@@ -206,6 +233,17 @@ describe("summarizeExercises", () => {
     assert.equal(stats.exerciseCount, 0);
     assert.equal(stats.setCount, 0);
     assert.equal(stats.summary, "");
+  });
+
+  test("groups paired lifts as one lineup entry", () => {
+    const exercises = [
+      { name: "Squat", supersetId: "ss-1", sets: [{}, {}, {}] },
+      { name: "Bench Press", supersetId: "ss-1", sets: [{}, {}, {}] },
+      { name: "Row", sets: [{}, {}] },
+    ];
+    const stats = summarizeExercises(exercises);
+    assert.equal(stats.summary, "Squat + Bench Press · 3/3 sets · Row · 2 sets");
+    assert.equal(formatExerciseLineup(exercises), "Squat + Bench Press · Row");
   });
 });
 
@@ -393,6 +431,28 @@ describe("workoutToExercises", () => {
     assert.equal(ex.sets.length, 2);
     assert.equal(ex.sets[0].previousWeight, null);
   });
+
+  test("reusing a saved workout keeps order and superset ids", () => {
+    const saved = {
+      name: "Push",
+      exercises: [
+        { name: "Squat", supersetId: "ss-1", sets: [{ weight: 225, reps: 5 }] },
+        { name: "Bench Press", supersetId: "ss-1", sets: [{ weight: 135, reps: 8 }] },
+        { name: "Row", sets: [{ weight: 155, reps: 8 }] },
+      ],
+    };
+    const loaded = workoutToExercises(saved, [saved]);
+    assert.deepEqual(
+      loaded.map((ex) => ({ name: ex.name, supersetId: ex.supersetId })),
+      [
+        { name: "Squat", supersetId: "ss-1" },
+        { name: "Bench Press", supersetId: "ss-1" },
+        { name: "Row", supersetId: null },
+      ]
+    );
+    assert.equal(loaded[0].sets[0].weight, "");
+    assert.equal(loaded[0].sets[0].previousWeight, 225);
+  });
 });
 
 describe("swap / saved routine", () => {
@@ -416,6 +476,36 @@ describe("swap / saved routine", () => {
     assert.equal(structuresEqual(original, [{ name: "Bench Press", setCount: 3 }]), true);
     assert.equal(structuresEqual(original, [{ name: "Dumbbell Bench Press", setCount: 3 }]), false);
     assert.equal(structuresEqual(original, [{ name: "Bench Press", setCount: 4 }]), false);
+  });
+
+  test("structuresEqual and swap keep superset pairing", () => {
+    const current = [
+      createExercise("Bench Press", 3, null, { supersetId: "ss-1" }),
+      createExercise("Barbell Row", 3, null, { supersetId: "ss-1" }),
+    ];
+    assert.equal(
+      structuresEqual(exerciseStructure(current), [
+        { name: "Bench Press", setCount: 3, supersetId: "ss-1" },
+        { name: "Barbell Row", setCount: 3, supersetId: "ss-1" },
+      ]),
+      true
+    );
+    assert.equal(
+      structuresEqual(exerciseStructure(current), [
+        { name: "Bench Press", setCount: 3 },
+        { name: "Barbell Row", setCount: 3 },
+      ]),
+      false,
+      "unpaired structure is not the same as a superset"
+    );
+    const unpaired = [
+      createExercise("Bench Press", 3),
+      createExercise("Barbell Row", 3),
+    ];
+    assert.equal(structuresEqual(exerciseStructure(current), exerciseStructure(unpaired)), false);
+    const swapped = swapExerciseAt(current, 0, "Dumbbell Bench Press");
+    assert.equal(swapped[0].supersetId, "ss-1");
+    assert.equal(swapped[1].supersetId, "ss-1");
   });
 
   test("updating a template replaces its exercises without touching history", () => {
@@ -861,6 +951,44 @@ describe("suggested workouts", () => {
     assert.ok(catalog.includes("Pull-ups"), "pull-ups stay in the bodyweight list for people who have a bar");
   });
 
+  test("templates pair antagonist / non-competing supersets by default", () => {
+    const upper = buildSplitWorkout("upper", defaultEquipmentIds());
+    assert.equal(upper[0].supersetId, upper[1].supersetId, "horizontal push/pull");
+    assert.equal(upper[2].supersetId, upper[3].supersetId, "vertical push/pull");
+    assert.equal(upper[4].supersetId, null, "laterals stay standalone");
+    assert.equal(upper[5].supersetId, upper[6].supersetId, "biceps/triceps");
+    assert.ok(upper[0].supersetId !== upper[2].supersetId);
+
+    const full = buildSplitWorkout("fullBody", defaultEquipmentIds());
+    assert.equal(full[0].supersetId, full[1].supersetId, "squat + horizontal press");
+    assert.equal(full[2].supersetId, full[3].supersetId, "hinge + row");
+    assert.equal(full[4].supersetId, full[5].supersetId, "press + core");
+
+    const lower = buildSplitWorkout("lower", defaultEquipmentIds());
+    assert.equal(lower[0].supersetId, lower[1].supersetId);
+    assert.equal(lower[2].supersetId, lower[3].supersetId);
+    assert.equal(lower[4].supersetId, lower[5].supersetId);
+  });
+
+  test("personalized suggestions pair antagonist muscles", () => {
+    const workouts = [
+      {
+        id: "w1",
+        name: "Push",
+        completedAt: "2026-08-23T18:00:00Z",
+        exercises: [{ name: "Bench Press", sets: [{ weight: 135, reps: 8 }, { weight: 135, reps: 8 }, { weight: 135, reps: 8 }] }],
+      },
+    ];
+    const suggestions = suggestWorkouts(workouts, { now: new Date("2026-08-24T12:00:00Z") });
+    assert.equal(suggestions[0].kind, "personalized");
+    const paired = suggestions[0].exercises.filter((ex) => ex.supersetId);
+    assert.ok(paired.length >= 2);
+    const ids = new Set(paired.map((ex) => ex.supersetId));
+    for (const id of ids) {
+      assert.equal(paired.filter((ex) => ex.supersetId === id).length, 2);
+    }
+  });
+
   test("restricted filters never keep a barbell-only compound", () => {
     for (const id of ["dumbbell", "bodyweight", "machine", "cable"]) {
       const names = ["fullBody", "upper", "lower"]
@@ -912,6 +1040,236 @@ describe("suggested workouts", () => {
   });
 });
 
+describe("supersets and rest-timer gating", () => {
+  test("togglePairWithNext pairs then unpairs adjacent lifts", () => {
+    const paired = togglePairWithNext(
+      [createExercise("Squat"), createExercise("Bench Press"), createExercise("Row")],
+      0
+    );
+    assert.ok(paired[0].supersetId);
+    assert.equal(paired[0].supersetId, paired[1].supersetId);
+    assert.equal(paired[2].supersetId, null);
+    const unpaired = togglePairWithNext(paired, 0);
+    assert.equal(unpaired[0].supersetId, null);
+    assert.equal(unpaired[1].supersetId, null);
+  });
+
+  test("pairing a lift already in a superset breaks the old pair", () => {
+    let list = togglePairWithNext(
+      [createExercise("A"), createExercise("B"), createExercise("C")],
+      0
+    );
+    list = togglePairWithNext(list, 1);
+    assert.equal(list[0].supersetId, null);
+    assert.equal(list[1].supersetId, list[2].supersetId);
+    assert.ok(list[1].supersetId);
+  });
+
+  test("moving a standalone skips over a superset without unpairing", () => {
+    const list = moveWorkoutBlock(
+      [
+        createExercise("Row"),
+        createExercise("Squat", 3, null, { supersetId: "ss-1" }),
+        createExercise("Bench Press", 3, null, { supersetId: "ss-1" }),
+      ],
+      0,
+      1
+    );
+    assert.deepEqual(
+      list.map((ex) => ex.name),
+      ["Squat", "Bench Press", "Row"]
+    );
+    assert.equal(list[0].supersetId, "ss-1");
+    assert.equal(list[1].supersetId, "ss-1");
+    assert.equal(list[2].supersetId, null);
+  });
+
+  test("moving a superset block past a standalone keeps the pair", () => {
+    const list = moveWorkoutBlock(
+      [
+        createExercise("Squat", 3, null, { supersetId: "ss-1" }),
+        createExercise("Bench Press", 3, null, { supersetId: "ss-1" }),
+        createExercise("Row"),
+      ],
+      0,
+      1
+    );
+    assert.deepEqual(
+      list.map((ex) => ex.name),
+      ["Row", "Squat", "Bench Press"]
+    );
+    assert.equal(list[1].supersetId, list[2].supersetId);
+    assert.equal(list[0].supersetId, null);
+  });
+
+  test("moveExercise on either lift in a pair moves the whole block", () => {
+    const start = [
+      createExercise("Row"),
+      createExercise("Squat", 3, null, { supersetId: "ss-1" }),
+      createExercise("Bench Press", 3, null, { supersetId: "ss-1" }),
+    ];
+    const fromFirst = moveExercise(start, 1, -1);
+    const fromSecond = moveExercise(start, 2, -1);
+    assert.deepEqual(
+      fromFirst.map((ex) => ex.name),
+      ["Squat", "Bench Press", "Row"]
+    );
+    assert.deepEqual(
+      fromSecond.map((ex) => ex.name),
+      ["Squat", "Bench Press", "Row"]
+    );
+    assert.equal(fromFirst[0].supersetId, fromFirst[1].supersetId);
+    assert.equal(fromFirst[2].supersetId, null);
+  });
+
+  test("swapSupersetPartners flips order inside the pair", () => {
+    const list = swapSupersetPartners(
+      [
+        createExercise("Squat", 3, null, { supersetId: "ss-1" }),
+        createExercise("Bench Press", 3, null, { supersetId: "ss-1" }),
+        createExercise("Row"),
+      ],
+      0
+    );
+    assert.deepEqual(
+      list.map((ex) => ex.name),
+      ["Bench Press", "Squat", "Row"]
+    );
+    assert.equal(list[0].supersetId, "ss-1");
+    assert.equal(list[1].supersetId, "ss-1");
+  });
+
+  test("dropTargetIndex inserts before or after without splitting blocks", () => {
+    assert.equal(dropTargetIndex(0, 2, "after"), 2);
+    assert.equal(dropTargetIndex(0, 2, "before"), 1);
+    assert.equal(dropTargetIndex(2, 0, "before"), 0);
+    assert.equal(dropTargetIndex(2, 0, "after"), 1);
+    assert.equal(dropTargetIndex(1, 1, "after"), 1);
+  });
+
+  test("dropPlaceFromOffset uses the hovered half of a block", () => {
+    assert.equal(dropPlaceFromOffset(10, 100), "before");
+    assert.equal(dropPlaceFromOffset(60, 100), "after");
+  });
+
+  test("dropWorkoutBlock can drag a pair past a standalone as one unit", () => {
+    const list = dropWorkoutBlock(
+      [
+        createExercise("Squat", 3, null, { supersetId: "ss-1" }),
+        createExercise("Bench Press", 3, null, { supersetId: "ss-1" }),
+        createExercise("Row"),
+      ],
+      0,
+      1,
+      "after"
+    );
+    assert.deepEqual(
+      list.map((ex) => ex.name),
+      ["Row", "Squat", "Bench Press"]
+    );
+    assert.equal(list[1].supersetId, list[2].supersetId);
+  });
+
+  test("reordering and pairing keep logged set values", () => {
+    const squat = createExercise("Squat", 2, null, { supersetId: "ss-1" });
+    squat.sets[0].weight = "225";
+    squat.sets[0].reps = "5";
+    squat.sets[0].completed = true;
+    const bench = createExercise("Bench Press", 2, null, { supersetId: "ss-1" });
+    bench.sets[0].weight = "135";
+    const row = createExercise("Row");
+    row.sets[0].weight = "155";
+    const moved = moveWorkoutBlock([squat, bench, row], 0, 1);
+    assert.equal(moved[1].name, "Squat");
+    assert.equal(moved[1].sets[0].weight, "225");
+    assert.equal(moved[1].sets[0].completed, true);
+    assert.equal(moved[0].sets[0].weight, "155");
+    const unpaired = togglePairWithNext(moved, 1);
+    assert.equal(unpaired[1].sets[0].weight, "225");
+    assert.equal(unpaired[1].supersetId, null);
+    assert.equal(canPairWithNext(unpaired, 1), true);
+    assert.equal(canPairWithNext(moved, 1), false);
+  });
+
+  test("normalizeSupersetAdjacency drops orphan ids", () => {
+    const cleaned = normalizeSupersetAdjacency([
+      createExercise("Squat", 3, null, { supersetId: "ss-1" }),
+      createExercise("Row"),
+      createExercise("Bench Press", 3, null, { supersetId: "ss-1" }),
+    ]);
+    assert.equal(cleaned[0].supersetId, null);
+    assert.equal(cleaned[2].supersetId, null);
+  });
+
+  test("groupedWorkoutItems yields adjacent pairs", () => {
+    const groups = groupedWorkoutItems([
+      createExercise("Squat", 3, null, { supersetId: "ss-1" }),
+      createExercise("Bench Press", 3, null, { supersetId: "ss-1" }),
+      createExercise("Row"),
+    ]);
+    assert.equal(groups.length, 2);
+    assert.equal(groups[0].kind, "superset");
+    assert.deepEqual(groups[0].indices, [0, 1]);
+    assert.equal(groups[1].kind, "single");
+  });
+
+  test("standalone completed sets start rest immediately", () => {
+    const squat = createExercise("Squat");
+    squat.sets[0].completed = true;
+    assert.equal(shouldStartRestTimer([squat], 0, 0), true);
+    squat.sets[0].completed = false;
+    assert.equal(shouldStartRestTimer([squat], 0, 0), false);
+  });
+
+  test("superset rest waits until both partners finish that set", () => {
+    const squat = createExercise("Squat", 2, null, { supersetId: "ss-1" });
+    const bench = createExercise("Bench Press", 2, null, { supersetId: "ss-1" });
+    squat.sets[0].completed = true;
+    assert.equal(shouldStartRestTimer([squat, bench], 0, 0), false);
+    bench.sets[0].completed = true;
+    assert.equal(shouldStartRestTimer([squat, bench], 0, 0), true);
+    assert.equal(shouldStartRestTimer([squat, bench], 1, 0), true);
+    squat.sets[1].completed = true;
+    assert.equal(shouldStartRestTimer([squat, bench], 0, 1), false);
+  });
+
+  test("rest notification copy names the next round", () => {
+    const squat = createExercise("Squat", 2, null, { supersetId: "ss-1" });
+    const bench = createExercise("Bench Press", 2, null, { supersetId: "ss-1" });
+    const mid = restNotificationPayload([squat, bench], 1, 0);
+    assert.equal(mid.title, "Rest over");
+    assert.equal(mid.body, "Next round: Squat + Bench Press.");
+    const last = restNotificationPayload([squat, bench], 0, 1);
+    assert.match(last.body, /Squat \+ Bench Press is done/);
+    const solo = restNotificationPayload([createExercise("Row", 3)], 0, 0);
+    assert.equal(solo.body, "Time for Row, set 2.");
+  });
+
+  test("notificationPermissionAction only requests when enabled and undecided", () => {
+    assert.equal(notificationPermissionAction("default", true), "request");
+    assert.equal(notificationPermissionAction("granted", true), "notify");
+    assert.equal(notificationPermissionAction("denied", true), "blocked");
+    assert.equal(notificationPermissionAction("default", false), "skip");
+  });
+
+  test("saving a suggestion keeps superset structure", () => {
+    const suggestion = {
+      name: "Upper",
+      exercises: [
+        { name: "Bench Press", setCount: 3, supersetId: "ss-1" },
+        { name: "Barbell Row", setCount: 3, supersetId: "ss-1" },
+        { name: "Lateral Raise", setCount: 3 },
+      ],
+    };
+    const [template] = saveSuggestionTemplate([], suggestion, new Date("2026-08-24T12:00:00Z"));
+    assert.equal(template.exercises[0].supersetId, "ss-1");
+    assert.equal(template.exercises[1].supersetId, "ss-1");
+    assert.equal(template.exercises[2].supersetId, null);
+    const loaded = workoutToExercises(template, []);
+    assert.equal(loaded[0].supersetId, loaded[1].supersetId);
+  });
+});
+
 describe("saved library hide / templates", () => {
   const history = [
     {
@@ -959,6 +1317,19 @@ describe("storage extras", () => {
     assert.equal(parsed.templates[0].id, "t1");
     assert.equal(parsed.settings.restSeconds, 120);
     assert.deepEqual(parsed.settings.equipmentIds, ["dumbbell"]);
+    assert.equal(parsed.settings.notifyRest, true);
+  });
+
+  test("notifyRest can be turned off and missing values default on", () => {
+    const parsed = parseStoredState(
+      serializeState({
+        workouts: [],
+        settings: { restSeconds: 90, equipmentIds: ["dumbbell"], notifyRest: false },
+      })
+    );
+    assert.equal(parsed.settings.notifyRest, false);
+    const legacy = parseStoredState(JSON.stringify({ workouts: [], settings: { restSeconds: 90 } }));
+    assert.equal(legacy.settings.notifyRest, true);
   });
 
   test("unknown rest values fall back to the 90s default", () => {

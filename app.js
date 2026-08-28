@@ -50,6 +50,18 @@ import {
   adjustTimerSeconds,
   suggestWorkouts,
   exercisesFromSuggestion,
+  groupedWorkoutItems,
+  togglePairWithNext,
+  moveWorkoutBlock,
+  swapSupersetPartners,
+  dropWorkoutBlock,
+  dropPlaceFromOffset,
+  canPairWithNext,
+  normalizeSupersetAdjacency,
+  shouldStartRestTimer,
+  restNotificationPayload,
+  formatExerciseLineup,
+  notificationPermissionAction,
   visibleLibraryItems,
   hideWorkoutFromLibrary,
   saveSuggestionTemplate,
@@ -101,6 +113,7 @@ const prMuscleFilters = document.getElementById("pr-muscle-filters");
 const equipmentFilters = document.getElementById("equipment-filters");
 const restPresets = document.getElementById("rest-presets");
 const timerRestPresets = document.getElementById("timer-rest-presets");
+const notifyRestToggle = document.getElementById("notify-rest-toggle");
 const suggestionList = document.getElementById("suggestion-list");
 const suggestHelp = document.getElementById("suggest-help");
 const timerMinusBtn = document.getElementById("timer-minus-btn");
@@ -123,6 +136,9 @@ let hiddenIds = [];
 let templates = [];
 let restSeconds = DEFAULT_REST_SECONDS;
 let equipmentIds = defaultEquipmentIds();
+let notifyRest = true;
+let restNotifyContext = null;
+let wakeLock = null;
 let sourceLibrary = null;
 let swapIndex = null;
 let swapMuscleFilter = null;
@@ -136,12 +152,14 @@ function loadWorkouts() {
     const settings = state.settings || defaultSettings();
     restSeconds = settings.restSeconds;
     equipmentIds = settings.equipmentIds;
+    notifyRest = settings.notifyRest !== false;
     return state.workouts;
   } catch {
     hiddenIds = [];
     templates = [];
     restSeconds = DEFAULT_REST_SECONDS;
     equipmentIds = defaultEquipmentIds();
+    notifyRest = true;
     return [];
   }
 }
@@ -154,7 +172,7 @@ function persistWorkouts() {
         workouts: savedWorkouts,
         hiddenIds,
         templates,
-        settings: { restSeconds, equipmentIds },
+        settings: { restSeconds, equipmentIds, notifyRest },
       })
     );
   } catch {
@@ -182,6 +200,7 @@ function applyImportedWorkouts(workouts, mode, extra = {}) {
     if (extra.settings) {
       restSeconds = extra.settings.restSeconds;
       equipmentIds = extra.settings.equipmentIds;
+      notifyRest = extra.settings.notifyRest !== false;
     }
     setBackupStatus(`Replaced history with ${workouts.length} workout${workouts.length !== 1 ? "s" : ""}.`, "success");
   } else {
@@ -205,6 +224,7 @@ function applyImportedWorkouts(workouts, mode, extra = {}) {
   renderPersonalRecords();
   renderEquipmentChips();
   renderRestPresets();
+  renderNotifyToggle();
   renderSuggestions();
   hideImportConfirm();
 }
@@ -225,7 +245,7 @@ async function exportBackup() {
   const payload = buildExportPayload(savedWorkouts, new Date().toISOString(), {
     hiddenIds,
     templates,
-    settings: { restSeconds, equipmentIds },
+    settings: { restSeconds, equipmentIds, notifyRest },
   });
   const json = JSON.stringify(payload, null, 2);
   const filename = exportFilename();
@@ -284,6 +304,111 @@ async function handleImportFile(file) {
   promptImportChoice(parsed);
 }
 
+function renderNotifyToggle() {
+  if (!notifyRestToggle) return;
+  notifyRestToggle.checked = notifyRest;
+}
+
+async function setNotifyRest(enabled) {
+  notifyRest = !!enabled;
+  persistWorkouts();
+  renderNotifyToggle();
+  if (notifyRest) await ensureNotificationPermission();
+}
+
+async function ensureNotificationPermission() {
+  if (!notifyRest || !("Notification" in window)) return;
+  const action = notificationPermissionAction(Notification.permission, notifyRest);
+  if (action !== "request") return;
+  try {
+    await Notification.requestPermission();
+  } catch {
+    // Safari can throw if this is not tied to a gesture.
+  }
+  renderNotifyToggle();
+}
+
+async function holdWakeLock() {
+  if (!navigator.wakeLock || document.visibilityState !== "visible") return;
+  try {
+    wakeLock = await navigator.wakeLock.request("screen");
+    wakeLock.addEventListener?.("release", () => {
+      if (wakeLock) wakeLock = null;
+    });
+  } catch {
+    wakeLock = null;
+  }
+}
+
+function releaseWakeLock() {
+  try {
+    wakeLock?.release?.();
+  } catch {
+    // Ignore.
+  }
+  wakeLock = null;
+}
+
+function restNotificationOptions(payload) {
+  return {
+    body: payload.body,
+    icon: "./icons/icon-192.png",
+    badge: "./icons/icon-192.png",
+    tag: "rest-timer",
+    renotify: true,
+    vibrate: [180, 80, 180],
+    data: { url: "./" },
+  };
+}
+
+async function showRestNotification(payload) {
+  if (!notifyRest || !("Notification" in window)) return;
+  if (Notification.permission !== "granted") return;
+  const options = restNotificationOptions(payload);
+  try {
+    const reg = await navigator.serviceWorker?.ready;
+    if (reg?.showNotification) {
+      await reg.showNotification(payload.title, options);
+      return;
+    }
+    if (reg?.active) {
+      reg.active.postMessage({ type: "REST_DONE", title: payload.title, body: payload.body });
+      return;
+    }
+  } catch {
+    // Fall through to the page Notification API.
+  }
+  try {
+    new Notification(payload.title, options);
+  } catch {
+    // iOS Safari only allows notifications from an installed PWA.
+  }
+}
+
+function fireRestNotification() {
+  if (!notifyRest) return;
+  try {
+    navigator.vibrate?.([180, 80, 180]);
+  } catch {
+    // Vibration is Android-only.
+  }
+  const payload = restNotifyContext
+    ? restNotificationPayload(
+        selectedExercises,
+        restNotifyContext.exerciseIndex,
+        restNotifyContext.setIndex
+      )
+    : { title: "Rest over", body: "Time for your next set." };
+  showRestNotification(payload);
+}
+
+function maybeStartRest(exerciseIndex, setIndex, justCompleted) {
+  if (!justCompleted) return;
+  if (!shouldStartRestTimer(selectedExercises, exerciseIndex, setIndex)) return;
+  restNotifyContext = { exerciseIndex, setIndex };
+  startRestTimer(restSeconds);
+}
+
 function startRestTimer(duration = restSeconds) {
   if (timerInterval) {
     clearInterval(timerInterval);
@@ -294,10 +419,13 @@ function startRestTimer(duration = restSeconds) {
   restTimerBar.classList.remove("hidden");
   restTimerBar.classList.remove("finished");
   renderTimerRestPresets();
+  holdWakeLock();
 
   if (timerSecondsLeft <= 0) {
     timerInterval = null;
     restTimerBar.classList.add("finished");
+    releaseWakeLock();
+    fireRestNotification();
     return;
   }
 
@@ -310,6 +438,8 @@ function startRestTimer(duration = restSeconds) {
       timerSecondsLeft = 0;
       timerDisplay.textContent = "0:00";
       restTimerBar.classList.add("finished");
+      releaseWakeLock();
+      fireRestNotification();
     } else {
       timerDisplay.textContent = formatTime(timerSecondsLeft);
     }
@@ -330,6 +460,8 @@ function stopRestTimer() {
     timerInterval = null;
   }
   restTimerBar.classList.add("hidden");
+  restTimerBar.classList.remove("finished");
+  releaseWakeLock();
 }
 
 function fillExerciseSelect(selectEl, { muscleId = null, excludeNames = [] } = {}) {
@@ -497,8 +629,8 @@ function renderSuggestions() {
   }
   suggestHelp.textContent =
     suggestions.length > 1
-      ? "No sessions in the last week — pick a hypertrophy split. Equipment filters apply."
-      : "Built from recent volume and 48-hour recovery, using only the equipment you have.";
+      ? "No sessions in the last week — pick a hypertrophy split with antagonist supersets. Equipment filters apply."
+      : "Built from recent volume and 48-hour recovery, using only the equipment you have. Supersets are on by default.";
 
   suggestions.forEach((suggestion) => {
     const card = document.createElement("div");
@@ -510,7 +642,7 @@ function renderSuggestions() {
     reason.textContent = suggestion.reason;
     const summary = document.createElement("p");
     summary.className = "suggestion-summary";
-    summary.textContent = suggestion.exercises.map((ex) => `${ex.name} · ${ex.setCount} sets`).join(" · ");
+    summary.textContent = formatExerciseLineup(suggestion.exercises);
     const actions = document.createElement("div");
     actions.className = "suggestion-actions";
     const useBtn = document.createElement("button");
@@ -537,6 +669,235 @@ function personalRecords() {
   return computePersonalRecords(savedWorkouts);
 }
 
+function muscleCaption(name) {
+  const muscleId = getMuscleForExercise(name);
+  return muscleId ? getMuscleLabel(muscleId) : "";
+}
+
+function builderNameEl(index) {
+  const item = selectedExercises[index];
+  const left = document.createElement("span");
+  left.className = "name";
+  const muscleName = muscleCaption(item.name);
+  left.innerHTML = `<span class="index">${index + 1}.</span>${item.name}${
+    muscleName ? `<span class="muscle">${muscleName}</span>` : ""
+  }`;
+  return left;
+}
+
+function tinyButton(label, { ariaLabel, active = false, disabled = false, onClick } = {}) {
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "btn-tiny" + (active ? " active" : "");
+  btn.textContent = label;
+  if (ariaLabel) btn.setAttribute("aria-label", ariaLabel);
+  btn.disabled = !!disabled;
+  if (onClick) btn.addEventListener("click", onClick);
+  return btn;
+}
+
+function refreshWorkoutStructure() {
+  if (!trackPhase.classList.contains("hidden")) {
+    renderSetsForm();
+  } else {
+    renderExerciseList();
+  }
+}
+
+function applyBlockChange(next) {
+  if (restNotifyContext) {
+    const name = selectedExercises[restNotifyContext.exerciseIndex]?.name;
+    const idx = name ? next.findIndex((ex) => ex.name === name) : -1;
+    if (idx >= 0) restNotifyContext = { ...restNotifyContext, exerciseIndex: idx };
+  }
+  selectedExercises = next;
+  refreshWorkoutStructure();
+}
+
+function appendBlockMoveButtons(actions, groupIndex, groupCount, label) {
+  actions.appendChild(
+    tinyButton("↑", {
+      ariaLabel: `Move ${label} up`,
+      disabled: groupIndex === 0,
+      onClick: () => applyBlockChange(moveWorkoutBlock(selectedExercises, groupIndex, -1)),
+    })
+  );
+  actions.appendChild(
+    tinyButton("↓", {
+      ariaLabel: `Move ${label} down`,
+      disabled: groupIndex === groupCount - 1,
+      onClick: () => applyBlockChange(moveWorkoutBlock(selectedExercises, groupIndex, 1)),
+    })
+  );
+}
+
+function appendPairActions(actions, group) {
+  const label = `${group.exercises[0].name} + ${group.exercises[1].name}`;
+  actions.appendChild(
+    tinyButton("Swap order", {
+      ariaLabel: `Swap order of ${label}`,
+      onClick: () => applyBlockChange(swapSupersetPartners(selectedExercises, group.indices[0])),
+    })
+  );
+  actions.appendChild(
+    tinyButton("Unpair", {
+      active: true,
+      onClick: () => applyBlockChange(togglePairWithNext(selectedExercises, group.indices[0])),
+    })
+  );
+}
+
+function createDragHandle(groupIndex) {
+  const handle = document.createElement("button");
+  handle.type = "button";
+  handle.className = "drag-handle";
+  handle.textContent = "⋮⋮";
+  handle.setAttribute("aria-label", "Drag to reorder");
+  bindBlockDrag(handle, groupIndex);
+  return handle;
+}
+
+let dragState = null;
+
+function clearDropHints() {
+  document.querySelectorAll("[data-block-index]").forEach((el) => {
+    el.classList.remove("drop-before", "drop-after", "is-dragging");
+  });
+}
+
+function endBlockDrag() {
+  if (!dragState) return;
+  const { handle, pointerId, from, over, place, moved } = dragState;
+  try {
+    if (handle?.hasPointerCapture?.(pointerId)) handle.releasePointerCapture(pointerId);
+  } catch {
+    // Capture may already be released.
+  }
+  document.body.classList.remove("is-block-dragging");
+  clearDropHints();
+  dragState = null;
+  if (!moved || over == null) return;
+  applyBlockChange(dropWorkoutBlock(selectedExercises, from, over, place));
+}
+
+function bindBlockDrag(handle, groupIndex) {
+  handle.addEventListener("pointerdown", (event) => {
+    if (event.button != null && event.button !== 0) return;
+    event.preventDefault();
+    handle.setPointerCapture(event.pointerId);
+    dragState = {
+      from: groupIndex,
+      over: groupIndex,
+      place: "before",
+      startY: event.clientY,
+      moved: false,
+      pointerId: event.pointerId,
+      handle,
+    };
+  });
+  handle.addEventListener("pointermove", (event) => {
+    if (!dragState || event.pointerId !== dragState.pointerId) return;
+    if (!dragState.moved && Math.abs(event.clientY - dragState.startY) < 8) return;
+    dragState.moved = true;
+    document.body.classList.add("is-block-dragging");
+    const source = document.querySelector(`[data-block-index="${dragState.from}"]`);
+    source?.classList.add("is-dragging");
+    const under = document.elementFromPoint(event.clientX, event.clientY);
+    const block = under?.closest?.("[data-block-index]");
+    if (!block) return;
+    const over = Number(block.dataset.blockIndex);
+    const rect = block.getBoundingClientRect();
+    const place = dropPlaceFromOffset(event.clientY - rect.top, rect.height);
+    dragState.over = over;
+    dragState.place = place;
+    clearDropHints();
+    source?.classList.add("is-dragging");
+    if (over !== dragState.from) {
+      block.classList.add(place === "before" ? "drop-before" : "drop-after");
+    }
+  });
+  handle.addEventListener("pointerup", (event) => {
+    if (!dragState || event.pointerId !== dragState.pointerId) return;
+    endBlockDrag();
+  });
+  handle.addEventListener("pointercancel", (event) => {
+    if (!dragState || event.pointerId !== dragState.pointerId) return;
+    dragState.moved = false;
+    endBlockDrag();
+  });
+}
+
+function appendBlockToolbar(container, group, groupIndex, groupCount) {
+  const toolbar = document.createElement("div");
+  toolbar.className = "block-toolbar";
+  if (groupCount > 1) toolbar.appendChild(createDragHandle(groupIndex));
+  const actions = document.createElement("div");
+  actions.className = "builder-actions";
+  const label =
+    group.kind === "superset"
+      ? `${group.exercises[0].name} + ${group.exercises[1].name}`
+      : group.exercises[0].name;
+  appendBlockMoveButtons(actions, groupIndex, groupCount, label);
+  if (group.kind === "superset") {
+    appendPairActions(actions, group);
+  } else if (canPairWithNext(selectedExercises, group.indices[0])) {
+    actions.appendChild(
+      tinyButton("Superset with next", {
+        onClick: () => applyBlockChange(togglePairWithNext(selectedExercises, group.indices[0])),
+      })
+    );
+  }
+  toolbar.appendChild(actions);
+  container.appendChild(toolbar);
+}
+
+function renderBuilderSingle(index, group, groupIndex, groupCount) {
+  const wrap = document.createElement("div");
+  wrap.className = "builder-exercise-row";
+  wrap.appendChild(builderNameEl(index));
+  appendBlockToolbar(wrap, group, groupIndex, groupCount);
+
+  const actions = wrap.querySelector(".builder-actions");
+  const removeBtn = document.createElement("button");
+  removeBtn.type = "button";
+  removeBtn.className = "btn btn-danger";
+  removeBtn.textContent = "Remove";
+  removeBtn.addEventListener("click", () => removeExercise(index));
+  actions.appendChild(removeBtn);
+  return wrap;
+}
+
+function renderBuilderPair(group, groupIndex, groupCount) {
+  const wrap = document.createElement("div");
+  wrap.className = "builder-superset";
+  const header = document.createElement("div");
+  header.className = "builder-block-header";
+  const badge = document.createElement("div");
+  badge.className = "superset-badge";
+  badge.textContent = "Superset";
+  header.appendChild(badge);
+  appendBlockToolbar(header, group, groupIndex, groupCount);
+  wrap.appendChild(header);
+
+  group.indices.forEach((index) => {
+    const row = document.createElement("div");
+    row.className = "builder-exercise-row";
+    row.appendChild(builderNameEl(index));
+    const rowActions = document.createElement("div");
+    rowActions.className = "builder-actions";
+    const removeBtn = document.createElement("button");
+    removeBtn.type = "button";
+    removeBtn.className = "btn btn-danger";
+    removeBtn.textContent = "Remove";
+    removeBtn.addEventListener("click", () => removeExercise(index));
+    rowActions.appendChild(removeBtn);
+    row.appendChild(rowActions);
+    wrap.appendChild(row);
+  });
+
+  return wrap;
+}
+
 function renderExerciseList() {
   exerciseList.innerHTML = "";
 
@@ -549,26 +910,17 @@ function renderExerciseList() {
     return;
   }
 
-  selectedExercises.forEach((item, index) => {
+  const groups = groupedWorkoutItems(selectedExercises);
+  groups.forEach((group, groupIndex) => {
     const li = document.createElement("li");
-    li.className = "exercise-list-item";
-
-    const left = document.createElement("span");
-    left.className = "name";
-    const muscleId = getMuscleForExercise(item.name);
-    const muscleName = muscleId ? getMuscleLabel(muscleId) : "";
-    left.innerHTML = `<span class="index">${index + 1}.</span>${item.name}${
-      muscleName ? `<span class="muscle">${muscleName}</span>` : ""
-    }`;
-
-    const removeBtn = document.createElement("button");
-    removeBtn.type = "button";
-    removeBtn.className = "btn btn-danger";
-    removeBtn.textContent = "Remove";
-    removeBtn.addEventListener("click", () => removeExercise(index));
-
-    li.appendChild(left);
-    li.appendChild(removeBtn);
+    li.dataset.blockIndex = String(groupIndex);
+    if (group.kind === "superset") {
+      li.className = "exercise-list-item is-superset";
+      li.appendChild(renderBuilderPair(group, groupIndex, groups.length));
+    } else {
+      li.className = "exercise-list-item";
+      li.appendChild(renderBuilderSingle(group.indices[0], group, groupIndex, groups.length));
+    }
     exerciseList.appendChild(li);
   });
 
@@ -592,6 +944,7 @@ function addExercise() {
 
 function removeExercise(index) {
   selectedExercises.splice(index, 1);
+  selectedExercises = normalizeSupersetAdjacency(selectedExercises);
   renderExerciseList();
 }
 
@@ -778,6 +1131,173 @@ function inputClassFor(setData, field) {
   return "input";
 }
 
+function renderExerciseBlock(item, exerciseIndex, prs) {
+  const block = document.createElement("div");
+  block.className = "exercise-block";
+  block.dataset.exerciseIndex = exerciseIndex;
+
+  const header = document.createElement("div");
+  header.className = "exercise-header";
+
+  const titleWrap = document.createElement("div");
+  const title = document.createElement("h3");
+  title.textContent = item.name;
+  titleWrap.appendChild(title);
+
+  const pr = prs[item.name];
+  if (pr) {
+    const prLine = document.createElement("div");
+    prLine.className = "exercise-pr";
+    prLine.textContent = `PR ${formatLoad(pr.weight, pr.reps)}`;
+    titleWrap.appendChild(prLine);
+  }
+
+  const setControls = document.createElement("div");
+  setControls.className = "set-controls";
+
+  const minusBtn = document.createElement("button");
+  minusBtn.type = "button";
+  minusBtn.className = "btn-set-control";
+  minusBtn.textContent = "−";
+  minusBtn.setAttribute("aria-label", `Remove a set from ${item.name}`);
+  if (item.sets.length <= 1) {
+    minusBtn.disabled = true;
+  }
+  minusBtn.addEventListener("click", () => removeSet(exerciseIndex));
+
+  const setBadge = document.createElement("span");
+  setBadge.className = "set-count-badge";
+  setBadge.textContent = `${item.sets.length} set${item.sets.length !== 1 ? "s" : ""}`;
+
+  const plusBtn = document.createElement("button");
+  plusBtn.type = "button";
+  plusBtn.className = "btn-set-control";
+  plusBtn.textContent = "+";
+  plusBtn.setAttribute("aria-label", `Add a set to ${item.name}`);
+  plusBtn.addEventListener("click", () => addSet(exerciseIndex));
+
+  setControls.appendChild(minusBtn);
+  setControls.appendChild(setBadge);
+  setControls.appendChild(plusBtn);
+
+  const actions = document.createElement("div");
+  actions.className = "exercise-header-actions";
+
+  const swapBtn = document.createElement("button");
+  swapBtn.type = "button";
+  swapBtn.className = "btn-swap";
+  swapBtn.textContent = "Swap";
+  swapBtn.setAttribute("aria-label", `Swap ${item.name}`);
+  swapBtn.addEventListener("click", () => openExercisePicker("swap", exerciseIndex));
+
+  actions.appendChild(swapBtn);
+  actions.appendChild(setControls);
+
+  header.appendChild(titleWrap);
+  header.appendChild(actions);
+  block.appendChild(header);
+
+  const tableHeader = document.createElement("div");
+  tableHeader.className = "sets-header";
+  tableHeader.innerHTML = "<span>Set</span><span>Weight</span><span>Reps</span><span></span>";
+  block.appendChild(tableHeader);
+
+  item.sets.forEach((setData, setIdx) => {
+    const setNum = setIdx + 1;
+    const group = document.createElement("div");
+    group.className = "set-group";
+
+    const row = document.createElement("div");
+    row.className = "set-row";
+
+    const setLabel = document.createElement("span");
+    setLabel.className = "set-number";
+    setLabel.textContent = setNum;
+
+    const weightInput = document.createElement("input");
+    weightInput.type = "number";
+    weightInput.className = inputClassFor(setData, "weight");
+    weightInput.placeholder = "lbs";
+    weightInput.min = "0";
+    weightInput.step = "2.5";
+    weightInput.value = setData.weight;
+    weightInput.inputMode = "decimal";
+    weightInput.setAttribute("aria-label", `${item.name} set ${setNum} weight`);
+
+    const repsInput = document.createElement("input");
+    repsInput.type = "number";
+    repsInput.className = inputClassFor(setData, "reps");
+    repsInput.placeholder = "reps";
+    repsInput.min = "0";
+    repsInput.step = "1";
+    repsInput.value = setData.reps;
+    repsInput.inputMode = "numeric";
+    repsInput.setAttribute("aria-label", `${item.name} set ${setNum} reps`);
+
+    const autoBtn = document.createElement("button");
+    autoBtn.type = "button";
+    autoBtn.className = "btn-autofill";
+    autoBtn.textContent = "✓";
+    syncAutofillButton(autoBtn, setData, item.name, setNum);
+
+    const refreshSetUi = () => {
+      weightInput.className = inputClassFor(setData, "weight");
+      repsInput.className = inputClassFor(setData, "reps");
+      syncAutofillButton(autoBtn, setData, item.name, setNum);
+    };
+
+    weightInput.addEventListener("input", (e) => {
+      const justCompleted = updateSetField(setData, "weight", e.target.value);
+      refreshSetUi();
+      maybeStartRest(exerciseIndex, setIdx, justCompleted);
+    });
+
+    repsInput.addEventListener("input", (e) => {
+      const justCompleted = updateSetField(setData, "reps", e.target.value);
+      refreshSetUi();
+      maybeStartRest(exerciseIndex, setIdx, justCompleted);
+    });
+
+    autoBtn.addEventListener("click", () => {
+      const justCompleted = applyPreviousSet(setData);
+      weightInput.value = setData.weight;
+      repsInput.value = setData.reps;
+      refreshSetUi();
+      maybeStartRest(exerciseIndex, setIdx, justCompleted);
+    });
+
+    row.appendChild(setLabel);
+    row.appendChild(weightInput);
+    row.appendChild(repsInput);
+    row.appendChild(autoBtn);
+
+    const prevRow = document.createElement("div");
+    prevRow.className = "set-prev-row";
+    const spacer = document.createElement("span");
+    const prevWeight = document.createElement("span");
+    prevWeight.className = hasPreviousSet(setData) ? "prev-hint" : "prev-hint empty";
+    prevWeight.textContent = hasPreviousSet(setData)
+      ? `prev ${setData.previousWeight ?? "—"}`
+      : "";
+    const prevReps = document.createElement("span");
+    prevReps.className = hasPreviousSet(setData) ? "prev-hint" : "prev-hint empty";
+    prevReps.textContent = hasPreviousSet(setData)
+      ? `prev ${setData.previousReps ?? "—"}`
+      : "";
+    const prevSpacer = document.createElement("span");
+    prevRow.appendChild(spacer);
+    prevRow.appendChild(prevWeight);
+    prevRow.appendChild(prevReps);
+    prevRow.appendChild(prevSpacer);
+
+    group.appendChild(row);
+    group.appendChild(prevRow);
+    block.appendChild(group);
+  });
+
+  return block;
+}
+
 function renderSetsForm() {
   setsContainer.innerHTML = "";
 
@@ -789,173 +1309,31 @@ function renderSetsForm() {
   `;
   setsContainer.appendChild(legend);
 
+  const note = document.createElement("p");
+  note.className = "legend rest-superset-note";
+  note.textContent = selectedExercises.some((ex) => ex.supersetId)
+    ? "Rest starts after both sides of a superset finish that set. Reorder with ↑↓ or the ⋮⋮ handle; a pair moves as one block."
+    : "Reorder with ↑↓ or the ⋮⋮ handle. Superset with next pairs two adjacent lifts.";
+  setsContainer.appendChild(note);
+
   const prs = personalRecords();
+  const groups = groupedWorkoutItems(selectedExercises);
 
-  selectedExercises.forEach((item, exerciseIndex) => {
-    const block = document.createElement("div");
-    block.className = "exercise-block";
-    block.dataset.exerciseIndex = exerciseIndex;
-
-    const header = document.createElement("div");
-    header.className = "exercise-header";
-
-    const titleWrap = document.createElement("div");
-    const title = document.createElement("h3");
-    title.textContent = item.name;
-    titleWrap.appendChild(title);
-
-    const pr = prs[item.name];
-    if (pr) {
-      const prLine = document.createElement("div");
-      prLine.className = "exercise-pr";
-      prLine.textContent = `PR ${formatLoad(pr.weight, pr.reps)}`;
-      titleWrap.appendChild(prLine);
+  groups.forEach((group, groupIndex) => {
+    const wrap = document.createElement("div");
+    wrap.className = group.kind === "superset" ? "track-block track-superset" : "track-block";
+    wrap.dataset.blockIndex = String(groupIndex);
+    if (group.kind === "superset") {
+      const label = document.createElement("div");
+      label.className = "superset-badge";
+      label.textContent = `Superset · ${group.exercises[0].name} + ${group.exercises[1].name}`;
+      wrap.appendChild(label);
     }
-
-    const setControls = document.createElement("div");
-    setControls.className = "set-controls";
-
-    const minusBtn = document.createElement("button");
-    minusBtn.type = "button";
-    minusBtn.className = "btn-set-control";
-    minusBtn.textContent = "−";
-    minusBtn.setAttribute("aria-label", `Remove a set from ${item.name}`);
-    if (item.sets.length <= 1) {
-      minusBtn.disabled = true;
-    }
-    minusBtn.addEventListener("click", () => removeSet(exerciseIndex));
-
-    const setBadge = document.createElement("span");
-    setBadge.className = "set-count-badge";
-    setBadge.textContent = `${item.sets.length} set${item.sets.length !== 1 ? "s" : ""}`;
-
-    const plusBtn = document.createElement("button");
-    plusBtn.type = "button";
-    plusBtn.className = "btn-set-control";
-    plusBtn.textContent = "+";
-    plusBtn.setAttribute("aria-label", `Add a set to ${item.name}`);
-    plusBtn.addEventListener("click", () => addSet(exerciseIndex));
-
-    setControls.appendChild(minusBtn);
-    setControls.appendChild(setBadge);
-    setControls.appendChild(plusBtn);
-
-    const actions = document.createElement("div");
-    actions.className = "exercise-header-actions";
-
-    const swapBtn = document.createElement("button");
-    swapBtn.type = "button";
-    swapBtn.className = "btn-swap";
-    swapBtn.textContent = "Swap";
-    swapBtn.setAttribute("aria-label", `Swap ${item.name}`);
-    swapBtn.addEventListener("click", () => openExercisePicker("swap", exerciseIndex));
-
-    actions.appendChild(swapBtn);
-    actions.appendChild(setControls);
-
-    header.appendChild(titleWrap);
-    header.appendChild(actions);
-    block.appendChild(header);
-
-    const tableHeader = document.createElement("div");
-    tableHeader.className = "sets-header";
-    tableHeader.innerHTML = "<span>Set</span><span>Weight</span><span>Reps</span><span></span>";
-    block.appendChild(tableHeader);
-
-    item.sets.forEach((setData, setIdx) => {
-      const setNum = setIdx + 1;
-      const group = document.createElement("div");
-      group.className = "set-group";
-
-      const row = document.createElement("div");
-      row.className = "set-row";
-
-      const setLabel = document.createElement("span");
-      setLabel.className = "set-number";
-      setLabel.textContent = setNum;
-
-      const weightInput = document.createElement("input");
-      weightInput.type = "number";
-      weightInput.className = inputClassFor(setData, "weight");
-      weightInput.placeholder = "lbs";
-      weightInput.min = "0";
-      weightInput.step = "2.5";
-      weightInput.value = setData.weight;
-      weightInput.inputMode = "decimal";
-      weightInput.setAttribute("aria-label", `${item.name} set ${setNum} weight`);
-
-      const repsInput = document.createElement("input");
-      repsInput.type = "number";
-      repsInput.className = inputClassFor(setData, "reps");
-      repsInput.placeholder = "reps";
-      repsInput.min = "0";
-      repsInput.step = "1";
-      repsInput.value = setData.reps;
-      repsInput.inputMode = "numeric";
-      repsInput.setAttribute("aria-label", `${item.name} set ${setNum} reps`);
-
-      const autoBtn = document.createElement("button");
-      autoBtn.type = "button";
-      autoBtn.className = "btn-autofill";
-      autoBtn.textContent = "✓";
-      syncAutofillButton(autoBtn, setData, item.name, setNum);
-
-      const refreshSetUi = () => {
-        weightInput.className = inputClassFor(setData, "weight");
-        repsInput.className = inputClassFor(setData, "reps");
-        syncAutofillButton(autoBtn, setData, item.name, setNum);
-      };
-
-      weightInput.addEventListener("input", (e) => {
-        const shouldStartTimer = updateSetField(setData, "weight", e.target.value);
-        refreshSetUi();
-        if (shouldStartTimer) startRestTimer(restSeconds);
-      });
-
-      repsInput.addEventListener("input", (e) => {
-        const shouldStartTimer = updateSetField(setData, "reps", e.target.value);
-        refreshSetUi();
-        if (shouldStartTimer) startRestTimer(restSeconds);
-      });
-
-      autoBtn.addEventListener("click", () => {
-        const shouldStartTimer = applyPreviousSet(setData);
-        weightInput.value = setData.weight;
-        repsInput.value = setData.reps;
-        refreshSetUi();
-        if (shouldStartTimer) startRestTimer(restSeconds);
-      });
-
-      row.appendChild(setLabel);
-      row.appendChild(weightInput);
-      row.appendChild(repsInput);
-      row.appendChild(autoBtn);
-
-      const prevRow = document.createElement("div");
-      prevRow.className = "set-prev-row";
-      const spacer = document.createElement("span");
-      const prevWeight = document.createElement("span");
-      prevWeight.className = hasPreviousSet(setData) ? "prev-hint" : "prev-hint empty";
-      prevWeight.textContent = hasPreviousSet(setData)
-        ? `prev ${setData.previousWeight ?? "—"}`
-        : "";
-      const prevReps = document.createElement("span");
-      prevReps.className = hasPreviousSet(setData) ? "prev-hint" : "prev-hint empty";
-      prevReps.textContent = hasPreviousSet(setData)
-        ? `prev ${setData.previousReps ?? "—"}`
-        : "";
-      const prevSpacer = document.createElement("span");
-      prevRow.appendChild(spacer);
-      prevRow.appendChild(prevWeight);
-      prevRow.appendChild(prevReps);
-      prevRow.appendChild(prevSpacer);
-
-      group.appendChild(row);
-      group.appendChild(prevRow);
-      block.appendChild(group);
+    appendBlockToolbar(wrap, group, groupIndex, groups.length);
+    group.indices.forEach((index) => {
+      wrap.appendChild(renderExerciseBlock(selectedExercises[index], index, prs));
     });
-
-    setsContainer.appendChild(block);
+    setsContainer.appendChild(wrap);
   });
 }
 
@@ -1078,28 +1456,37 @@ function renderSummary(workoutData) {
 
   summaryDetails.innerHTML = "";
 
-  workoutData.forEach((exercise) => {
-    const div = document.createElement("div");
-    div.className = "summary-exercise";
-
-    const heading = document.createElement("h4");
-    heading.textContent = exercise.name;
-    div.appendChild(heading);
-
-    exercise.sets.forEach((set) => {
-      const p = document.createElement("p");
-      p.className = "summary-set";
-      p.textContent = `Set ${set.set}: ${formatLoad(set.weight, set.reps)}`;
-      div.appendChild(p);
+  groupedWorkoutItems(workoutData).forEach((group) => {
+    const wrap = document.createElement("div");
+    wrap.className = group.kind === "superset" ? "summary-superset" : "";
+    if (group.kind === "superset") {
+      const badge = document.createElement("div");
+      badge.className = "superset-badge";
+      badge.textContent = "Superset";
+      wrap.appendChild(badge);
+    }
+    group.exercises.forEach((exercise) => {
+      const div = document.createElement("div");
+      div.className = "summary-exercise";
+      const heading = document.createElement("h4");
+      heading.textContent = exercise.name;
+      div.appendChild(heading);
+      exercise.sets.forEach((set) => {
+        const p = document.createElement("p");
+        p.className = "summary-set";
+        p.textContent = `Set ${set.set}: ${formatLoad(set.weight, set.reps)}`;
+        div.appendChild(p);
+      });
+      wrap.appendChild(div);
     });
-
-    summaryDetails.appendChild(div);
+    summaryDetails.appendChild(wrap);
   });
 }
 
 function startWorkout() {
   if (selectedExercises.length === 0) return;
   selectedExercises = attachPreviousSets(selectedExercises, savedWorkouts);
+  ensureNotificationPermission();
   renderSetsForm();
   showPhase("track");
   window.scrollTo({ top: 0, behavior: "smooth" });
@@ -1147,6 +1534,11 @@ function bindEvents() {
     if (e.key === "Enter") addExercise();
   });
   startWorkoutBtn.addEventListener("click", startWorkout);
+  if (notifyRestToggle) {
+    notifyRestToggle.addEventListener("change", () => {
+      setNotifyRest(notifyRestToggle.checked);
+    });
+  }
   finishWorkoutBtn.addEventListener("click", finishWorkout);
   trackAddExerciseBtn.addEventListener("click", () => openExercisePicker("add"));
   swapConfirmBtn.addEventListener("click", confirmExercisePicker);
@@ -1168,6 +1560,9 @@ function bindEvents() {
   dismissTimerBtn.addEventListener("click", stopRestTimer);
   timerMinusBtn.addEventListener("click", () => nudgeTimer(-TIMER_ADJUST_SECONDS));
   timerPlusBtn.addEventListener("click", () => nudgeTimer(TIMER_ADJUST_SECONDS));
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible" && timerInterval) holdWakeLock();
+  });
 
   workoutNameInput.addEventListener("input", () => {
     summaryNameInput.value = workoutNameInput.value;
@@ -1216,6 +1611,7 @@ renderMuscleChips(muscleFilters, muscleFilter, setMuscleFilter);
 renderMuscleChips(prMuscleFilters, prMuscleFilter, setPrMuscleFilter);
 renderEquipmentChips();
 renderRestPresets();
+renderNotifyToggle();
 populateDropdown();
 renderExerciseList();
 renderSuggestions();
