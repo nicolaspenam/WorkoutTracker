@@ -1,9 +1,12 @@
 import {
   EXERCISES,
   MUSCLE_GROUPS,
+  EQUIPMENT,
   SETS_PER_EXERCISE,
   DEFAULT_REST_SECONDS,
+  REST_PRESETS,
   STORAGE_KEY,
+  TIMER_ADJUST_SECONDS,
   formatTime,
   createExercise,
   collectWorkoutData,
@@ -31,11 +34,22 @@ import {
   parseImportPayload,
   mergeWorkouts,
   exportFilename,
-  filterExercisesByMuscle,
   groupExercisesByMuscle,
   getMuscleForExercise,
   getMuscleLabel,
   filterRecordsByMuscle,
+  defaultEquipmentIds,
+  defaultSettings,
+  filterCatalog,
+  toggleEquipmentId,
+  hasAllEquipment,
+  adjustTimerSeconds,
+  suggestWorkouts,
+  exercisesFromSuggestion,
+  visibleLibraryItems,
+  hideWorkoutFromLibrary,
+  saveSuggestionTemplate,
+  removeTemplate,
 } from "./logic.js";
 
 const buildPhase = document.getElementById("build-phase");
@@ -67,6 +81,13 @@ const importReplaceBtn = document.getElementById("import-replace-btn");
 const importCancelBtn = document.getElementById("import-cancel-btn");
 const muscleFilters = document.getElementById("muscle-filters");
 const prMuscleFilters = document.getElementById("pr-muscle-filters");
+const equipmentFilters = document.getElementById("equipment-filters");
+const restPresets = document.getElementById("rest-presets");
+const timerRestPresets = document.getElementById("timer-rest-presets");
+const suggestionList = document.getElementById("suggestion-list");
+const suggestHelp = document.getElementById("suggest-help");
+const timerMinusBtn = document.getElementById("timer-minus-btn");
+const timerPlusBtn = document.getElementById("timer-plus-btn");
 
 const restTimerBar = document.getElementById("rest-timer-bar");
 const timerDisplay = document.getElementById("timer-display");
@@ -81,18 +102,40 @@ let activeTab = "workout";
 let pendingImport = null;
 let muscleFilter = null;
 let prMuscleFilter = null;
+let hiddenIds = [];
+let templates = [];
+let restSeconds = DEFAULT_REST_SECONDS;
+let equipmentIds = defaultEquipmentIds();
 
 function loadWorkouts() {
   try {
-    return parseStoredState(localStorage.getItem(STORAGE_KEY)).workouts;
+    const state = parseStoredState(localStorage.getItem(STORAGE_KEY));
+    hiddenIds = state.hiddenIds || [];
+    templates = state.templates || [];
+    const settings = state.settings || defaultSettings();
+    restSeconds = settings.restSeconds;
+    equipmentIds = settings.equipmentIds;
+    return state.workouts;
   } catch {
+    hiddenIds = [];
+    templates = [];
+    restSeconds = DEFAULT_REST_SECONDS;
+    equipmentIds = defaultEquipmentIds();
     return [];
   }
 }
 
 function persistWorkouts() {
   try {
-    localStorage.setItem(STORAGE_KEY, serializeState(savedWorkouts));
+    localStorage.setItem(
+      STORAGE_KEY,
+      serializeState({
+        workouts: savedWorkouts,
+        hiddenIds,
+        templates,
+        settings: { restSeconds, equipmentIds },
+      })
+    );
   } catch {
     // Storage may be unavailable (private mode / quota). Keep working in-memory.
   }
@@ -110,13 +153,26 @@ function hideImportConfirm() {
   importFileInput.value = "";
 }
 
-function applyImportedWorkouts(workouts, mode) {
+function applyImportedWorkouts(workouts, mode, extra = {}) {
   if (mode === "replace") {
     savedWorkouts = workouts;
+    hiddenIds = extra.hiddenIds || [];
+    templates = extra.templates || [];
+    if (extra.settings) {
+      restSeconds = extra.settings.restSeconds;
+      equipmentIds = extra.settings.equipmentIds;
+    }
     setBackupStatus(`Replaced history with ${workouts.length} workout${workouts.length !== 1 ? "s" : ""}.`, "success");
   } else {
     const result = mergeWorkouts(savedWorkouts, workouts);
     savedWorkouts = result.workouts;
+    if (Array.isArray(extra.hiddenIds) && extra.hiddenIds.length) {
+      hiddenIds = [...new Set([...hiddenIds, ...extra.hiddenIds.filter((id) => typeof id === "string")])];
+    }
+    if (Array.isArray(extra.templates) && extra.templates.length) {
+      const existingIds = new Set(templates.map((t) => t.id));
+      templates = [...templates, ...extra.templates.filter((t) => t?.id && !existingIds.has(t.id))];
+    }
     const parts = [`Added ${result.added} workout${result.added !== 1 ? "s" : ""}`];
     if (result.skipped) {
       parts.push(`${result.skipped} already present`);
@@ -126,6 +182,9 @@ function applyImportedWorkouts(workouts, mode) {
   persistWorkouts();
   renderSavedWorkouts();
   renderPersonalRecords();
+  renderEquipmentChips();
+  renderRestPresets();
+  renderSuggestions();
   hideImportConfirm();
 }
 
@@ -142,7 +201,11 @@ function downloadBackupFile(filename, json) {
 }
 
 async function exportBackup() {
-  const payload = buildExportPayload(savedWorkouts);
+  const payload = buildExportPayload(savedWorkouts, new Date().toISOString(), {
+    hiddenIds,
+    templates,
+    settings: { restSeconds, equipmentIds },
+  });
   const json = JSON.stringify(payload, null, 2);
   const filename = exportFilename();
   const blob = new Blob([json], { type: "application/json" });
@@ -166,10 +229,10 @@ async function exportBackup() {
   setBackupStatus(`Downloaded ${filename}. Keep a copy in Drive, iCloud, or email.`, "success");
 }
 
-function promptImportChoice(workouts) {
-  pendingImport = workouts;
+function promptImportChoice(parsed) {
+  pendingImport = parsed;
   importConfirmText.textContent =
-    `This backup has ${workouts.length} workout${workouts.length !== 1 ? "s" : ""}. ` +
+    `This backup has ${parsed.workouts.length} workout${parsed.workouts.length !== 1 ? "s" : ""}. ` +
     `You already have ${savedWorkouts.length}. Merge keeps both; Replace overwrites this device.`;
   importConfirm.classList.remove("hidden");
 }
@@ -192,23 +255,30 @@ async function handleImportFile(file) {
     return;
   }
 
-  if (savedWorkouts.length === 0) {
-    applyImportedWorkouts(parsed.workouts, "replace");
+  if (savedWorkouts.length === 0 && templates.length === 0) {
+    applyImportedWorkouts(parsed.workouts, "replace", parsed);
     return;
   }
 
-  promptImportChoice(parsed.workouts);
+  promptImportChoice(parsed);
 }
 
-function startRestTimer(duration = DEFAULT_REST_SECONDS) {
+function startRestTimer(duration = restSeconds) {
   if (timerInterval) {
     clearInterval(timerInterval);
   }
 
-  timerSecondsLeft = duration;
+  timerSecondsLeft = Math.max(0, duration);
   timerDisplay.textContent = formatTime(timerSecondsLeft);
   restTimerBar.classList.remove("hidden");
   restTimerBar.classList.remove("finished");
+  renderTimerRestPresets();
+
+  if (timerSecondsLeft <= 0) {
+    timerInterval = null;
+    restTimerBar.classList.add("finished");
+    return;
+  }
 
   timerInterval = setInterval(() => {
     timerSecondsLeft--;
@@ -223,6 +293,32 @@ function startRestTimer(duration = DEFAULT_REST_SECONDS) {
       timerDisplay.textContent = formatTime(timerSecondsLeft);
     }
   }, 1000);
+}
+
+function nudgeTimer(delta) {
+  const wasFinished = restTimerBar.classList.contains("finished") || timerSecondsLeft <= 0;
+  const next = adjustTimerSeconds(timerSecondsLeft, delta);
+  if (restTimerBar.classList.contains("hidden")) {
+    startRestTimer(next || restSeconds);
+    return;
+  }
+  if (wasFinished && next > 0) {
+    startRestTimer(next);
+    return;
+  }
+  timerSecondsLeft = next;
+  timerDisplay.textContent = formatTime(timerSecondsLeft);
+  if (timerSecondsLeft <= 0) {
+    if (timerInterval) {
+      clearInterval(timerInterval);
+      timerInterval = null;
+    }
+    timerSecondsLeft = 0;
+    timerDisplay.textContent = "0:00";
+    restTimerBar.classList.add("finished");
+    return;
+  }
+  restTimerBar.classList.remove("finished");
 }
 
 function stopRestTimer() {
@@ -244,7 +340,7 @@ function populateDropdown() {
     : "Choose an exercise…";
   exerciseSelect.appendChild(placeholder);
 
-  const filtered = filterExercisesByMuscle(EXERCISES, muscleFilter);
+  const filtered = filterCatalog(EXERCISES, muscleFilter, equipmentIds);
 
   if (muscleFilter) {
     filtered
@@ -300,6 +396,130 @@ function setPrMuscleFilter(muscleId) {
   prMuscleFilter = muscleId;
   renderMuscleChips(prMuscleFilters, prMuscleFilter, setPrMuscleFilter);
   renderPersonalRecords();
+}
+
+function renderEquipmentChips() {
+  equipmentFilters.innerHTML = "";
+  const allOn = hasAllEquipment(equipmentIds);
+  const allBtn = document.createElement("button");
+  allBtn.type = "button";
+  allBtn.className = "muscle-chip" + (allOn ? " active" : "");
+  allBtn.textContent = "All";
+  allBtn.setAttribute("aria-pressed", allOn ? "true" : "false");
+  allBtn.addEventListener("click", () => {
+    equipmentIds = defaultEquipmentIds();
+    persistWorkouts();
+    renderEquipmentChips();
+    populateDropdown();
+    renderSuggestions();
+  });
+  equipmentFilters.appendChild(allBtn);
+
+  EQUIPMENT.forEach((item) => {
+    const on = equipmentIds.includes(item.id);
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "muscle-chip" + (on ? " active" : "");
+    btn.textContent = item.label;
+    btn.setAttribute("aria-pressed", on ? "true" : "false");
+    btn.addEventListener("click", () => {
+      equipmentIds = toggleEquipmentId(equipmentIds, item.id);
+      persistWorkouts();
+      renderEquipmentChips();
+      populateDropdown();
+      renderSuggestions();
+    });
+    equipmentFilters.appendChild(btn);
+  });
+}
+
+function renderRestPresetButtons(container) {
+  container.innerHTML = "";
+  REST_PRESETS.forEach((seconds) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "rest-chip" + (restSeconds === seconds ? " active" : "");
+    btn.textContent = formatTime(seconds);
+    btn.addEventListener("click", () => {
+      restSeconds = seconds;
+      persistWorkouts();
+      renderRestPresets();
+      if (!restTimerBar.classList.contains("hidden")) {
+        startRestTimer(seconds);
+      }
+    });
+    container.appendChild(btn);
+  });
+}
+
+function renderRestPresets() {
+  renderRestPresetButtons(restPresets);
+  renderTimerRestPresets();
+}
+
+function renderTimerRestPresets() {
+  if (timerRestPresets) renderRestPresetButtons(timerRestPresets);
+}
+
+function applySuggestion(suggestion) {
+  selectedExercises = exercisesFromSuggestion(suggestion, savedWorkouts);
+  workoutNameInput.value = suggestion.name || "";
+  renderExerciseList();
+  setActiveTab("workout");
+  phaseLabel.textContent = `Loaded ${suggestion.name}`;
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+function saveSuggestion(suggestion) {
+  templates = saveSuggestionTemplate(templates, suggestion);
+  persistWorkouts();
+  renderSavedWorkouts();
+  setActiveTab("history");
+}
+
+function renderSuggestions() {
+  const suggestions = suggestWorkouts(savedWorkouts, { equipmentIds });
+  suggestionList.innerHTML = "";
+  if (suggestions.length === 0) {
+    suggestHelp.textContent = "No matching exercises for that equipment mix.";
+    return;
+  }
+  suggestHelp.textContent =
+    suggestions.length > 1
+      ? "No sessions in the last week — pick a hypertrophy split. Equipment filters apply."
+      : "Built from recent volume and 48-hour recovery, using only the equipment you have.";
+
+  suggestions.forEach((suggestion) => {
+    const card = document.createElement("div");
+    card.className = "suggestion-card";
+    const title = document.createElement("h3");
+    title.textContent = suggestion.name;
+    const reason = document.createElement("p");
+    reason.className = "suggestion-reason";
+    reason.textContent = suggestion.reason;
+    const summary = document.createElement("p");
+    summary.className = "suggestion-summary";
+    summary.textContent = suggestion.exercises.map((ex) => `${ex.name} · ${ex.setCount} sets`).join(" · ");
+    const actions = document.createElement("div");
+    actions.className = "suggestion-actions";
+    const useBtn = document.createElement("button");
+    useBtn.type = "button";
+    useBtn.className = "btn btn-primary";
+    useBtn.textContent = "Use workout";
+    useBtn.addEventListener("click", () => applySuggestion(suggestion));
+    const saveBtn = document.createElement("button");
+    saveBtn.type = "button";
+    saveBtn.className = "btn btn-secondary";
+    saveBtn.textContent = "Save to list";
+    saveBtn.addEventListener("click", () => saveSuggestion(suggestion));
+    actions.appendChild(useBtn);
+    actions.appendChild(saveBtn);
+    card.appendChild(title);
+    card.appendChild(reason);
+    card.appendChild(summary);
+    card.appendChild(actions);
+    suggestionList.appendChild(card);
+  });
 }
 
 function personalRecords() {
@@ -407,16 +627,17 @@ function setActiveTab(tab) {
 
 function renderSavedWorkouts() {
   savedWorkoutsList.innerHTML = "";
+  const items = visibleLibraryItems(savedWorkouts, hiddenIds, templates);
 
-  if (savedWorkouts.length === 0) {
+  if (items.length === 0) {
     const li = document.createElement("li");
     li.className = "empty-state";
-    li.textContent = "No saved workouts yet. Finish a session to reuse it next time.";
+    li.textContent = "No saved workouts yet. Finish a session or save a suggestion.";
     savedWorkoutsList.appendChild(li);
     return;
   }
 
-  savedWorkouts.forEach((workout) => {
+  items.forEach((workout) => {
     const li = document.createElement("li");
     li.className = "saved-item";
 
@@ -431,11 +652,16 @@ function renderSavedWorkouts() {
     const date = document.createElement("div");
     date.className = "saved-item-date";
     const stats = summarizeExercises(workout.exercises);
-    const when = formatFullDate(workout.completedAt);
+    const when = workout.kind === "template"
+      ? "Saved suggestion"
+      : formatFullDate(workout.completedAt);
     date.textContent = `${when} · ${stats.exerciseCount} exercise${stats.exerciseCount !== 1 ? "s" : ""}`;
 
     text.appendChild(title);
     text.appendChild(date);
+
+    const actions = document.createElement("div");
+    actions.className = "saved-item-actions";
 
     const useBtn = document.createElement("button");
     useBtn.type = "button";
@@ -443,8 +669,25 @@ function renderSavedWorkouts() {
     useBtn.textContent = "Use workout";
     useBtn.addEventListener("click", () => useSavedWorkout(workout));
 
+    const removeBtn = document.createElement("button");
+    removeBtn.type = "button";
+    removeBtn.className = "btn btn-danger";
+    removeBtn.textContent = "Remove";
+    removeBtn.addEventListener("click", () => {
+      if (workout.kind === "template") {
+        templates = removeTemplate(templates, workout.id);
+      } else {
+        hiddenIds = hideWorkoutFromLibrary(hiddenIds, workout.id);
+      }
+      persistWorkouts();
+      renderSavedWorkouts();
+    });
+
+    actions.appendChild(useBtn);
+    actions.appendChild(removeBtn);
+
     header.appendChild(text);
-    header.appendChild(useBtn);
+    header.appendChild(actions);
 
     const summary = document.createElement("p");
     summary.className = "saved-item-summary";
@@ -636,13 +879,13 @@ function renderSetsForm() {
       weightInput.addEventListener("input", (e) => {
         const shouldStartTimer = updateSetField(setData, "weight", e.target.value);
         refreshSetUi();
-        if (shouldStartTimer) startRestTimer(DEFAULT_REST_SECONDS);
+        if (shouldStartTimer) startRestTimer(restSeconds);
       });
 
       repsInput.addEventListener("input", (e) => {
         const shouldStartTimer = updateSetField(setData, "reps", e.target.value);
         refreshSetUi();
-        if (shouldStartTimer) startRestTimer(DEFAULT_REST_SECONDS);
+        if (shouldStartTimer) startRestTimer(restSeconds);
       });
 
       autoBtn.addEventListener("click", () => {
@@ -650,7 +893,7 @@ function renderSetsForm() {
         weightInput.value = setData.weight;
         repsInput.value = setData.reps;
         refreshSetUi();
-        if (shouldStartTimer) startRestTimer(DEFAULT_REST_SECONDS);
+        if (shouldStartTimer) startRestTimer(restSeconds);
       });
 
       row.appendChild(setLabel);
@@ -748,6 +991,7 @@ function finishWorkout() {
   renderSummary(data);
   renderSavedWorkouts();
   renderPersonalRecords();
+  renderSuggestions();
   showPhase("summary");
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
@@ -773,6 +1017,8 @@ function bindEvents() {
   finishWorkoutBtn.addEventListener("click", finishWorkout);
   newWorkoutBtn.addEventListener("click", resetWorkout);
   dismissTimerBtn.addEventListener("click", stopRestTimer);
+  timerMinusBtn.addEventListener("click", () => nudgeTimer(-TIMER_ADJUST_SECONDS));
+  timerPlusBtn.addEventListener("click", () => nudgeTimer(TIMER_ADJUST_SECONDS));
 
   workoutNameInput.addEventListener("input", () => {
     summaryNameInput.value = workoutNameInput.value;
@@ -805,10 +1051,10 @@ function bindEvents() {
     handleImportFile(file);
   });
   importMergeBtn.addEventListener("click", () => {
-    if (pendingImport) applyImportedWorkouts(pendingImport, "merge");
+    if (pendingImport) applyImportedWorkouts(pendingImport.workouts, "merge", pendingImport);
   });
   importReplaceBtn.addEventListener("click", () => {
-    if (pendingImport) applyImportedWorkouts(pendingImport, "replace");
+    if (pendingImport) applyImportedWorkouts(pendingImport.workouts, "replace", pendingImport);
   });
   importCancelBtn.addEventListener("click", () => {
     hideImportConfirm();
@@ -819,8 +1065,15 @@ function bindEvents() {
 savedWorkouts = loadWorkouts();
 renderMuscleChips(muscleFilters, muscleFilter, setMuscleFilter);
 renderMuscleChips(prMuscleFilters, prMuscleFilter, setPrMuscleFilter);
+renderEquipmentChips();
+renderRestPresets();
 populateDropdown();
 renderExerciseList();
+renderSuggestions();
 renderSavedWorkouts();
 renderPersonalRecords();
 bindEvents();
+
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("./sw.js").catch(() => {});
+}

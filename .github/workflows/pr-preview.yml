@@ -26,8 +26,9 @@ jobs:
       - name: Assemble static site
         if: github.event.action != 'closed'
         run: |
-          mkdir -p site
-          cp index.html styles.css app.js logic.js site/
+          mkdir -p site/icons
+          cp index.html styles.css app.js logic.js manifest.webmanifest sw.js site/
+          cp icons/*.png site/icons/
           touch site/.nojekyll
 
       - name: Deploy preview

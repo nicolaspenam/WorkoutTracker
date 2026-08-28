@@ -49,6 +49,22 @@ import {
   getMuscleForExercise,
   getMuscleLabel,
   filterRecordsByMuscle,
+  EQUIPMENT,
+  REST_PRESETS,
+  LOOKBACK_DAYS,
+  TIMER_ADJUST_SECONDS,
+  defaultEquipmentIds,
+  filterCatalog,
+  filterExercisesByEquipment,
+  toggleEquipmentId,
+  hasAllEquipment,
+  adjustTimerSeconds,
+  suggestWorkouts,
+  buildSplitWorkout,
+  saveSuggestionTemplate,
+  removeTemplate,
+  hideWorkoutFromLibrary,
+  visibleLibraryItems,
 } from "./logic.js";
 
 // ─── formatTime ───────────────────────────────────────────────────────────────
@@ -631,5 +647,171 @@ describe("exercise catalog / muscle filter", () => {
     const chest = filterRecordsByMuscle(records, "chest");
     assert.deepEqual(chest.map((r) => r.name), ["Bench Press"]);
     assert.equal(filterRecordsByMuscle(records, null).length, 3);
+  });
+});
+
+describe("equipment filter", () => {
+  const allowed = new Set(EQUIPMENT.map((item) => item.id));
+
+  test("every exercise has at least one known equipment tag", () => {
+    for (const ex of EXERCISES) {
+      assert.ok(Array.isArray(ex.equipment) && ex.equipment.length, `${ex.name} missing equipment`);
+      assert.ok(ex.equipment.every((id) => allowed.has(id)), `${ex.name} has unknown equipment`);
+    }
+  });
+
+  test("bodyweight-only catalog still includes push-ups and squats via bodyweight tags", () => {
+    const filtered = filterExercisesByEquipment(EXERCISES, ["bodyweight"]);
+    const names = filtered.map((ex) => ex.name);
+    assert.ok(names.includes("Push-ups"));
+    assert.ok(names.includes("Plank"));
+    assert.ok(!names.includes("Bench Press"));
+    assert.ok(!names.includes("Lat Pulldown"));
+  });
+
+  test("dumbbell-only keeps dumbbell bench and drops barbell bench", () => {
+    const filtered = filterCatalog(EXERCISES, "chest", ["dumbbell"]);
+    const names = filtered.map((ex) => ex.name);
+    assert.ok(names.includes("Dumbbell Bench Press"));
+    assert.ok(!names.includes("Bench Press"));
+  });
+
+  test("toggle from all isolates that type; never allows an empty selection", () => {
+    const all = defaultEquipmentIds();
+    assert.equal(hasAllEquipment(all), true);
+    assert.deepEqual(toggleEquipmentId(all, "dumbbell"), ["dumbbell"]);
+    assert.deepEqual(toggleEquipmentId(["dumbbell"], "bodyweight").sort(), ["bodyweight", "dumbbell"]);
+    assert.deepEqual(toggleEquipmentId(["dumbbell"], "dumbbell"), all);
+  });
+});
+
+describe("rest timer helpers", () => {
+  test("presets are 1:00, 1:30, and 2:00", () => {
+    assert.deepEqual(REST_PRESETS, [60, 90, 120]);
+  });
+
+  test("adjustTimerSeconds clamps and steps by 15", () => {
+    assert.equal(adjustTimerSeconds(90, TIMER_ADJUST_SECONDS), 105);
+    assert.equal(adjustTimerSeconds(10, -TIMER_ADJUST_SECONDS), 0);
+    assert.equal(adjustTimerSeconds(590, 15), 600);
+  });
+});
+
+describe("suggested workouts", () => {
+  test("with no recent sessions offers full / upper / lower templates", () => {
+    const suggestions = suggestWorkouts([], { now: new Date("2026-08-24T12:00:00Z") });
+    assert.deepEqual(suggestions.map((s) => s.kind), ["fullBody", "upper", "lower"]);
+    assert.ok(suggestions.every((s) => s.exercises.length >= 4));
+  });
+
+  test("templates respect equipment filters", () => {
+    const suggestions = suggestWorkouts([], {
+      equipmentIds: ["bodyweight"],
+      now: new Date("2026-08-24T12:00:00Z"),
+    });
+    const names = suggestions.flatMap((s) => s.exercises.map((ex) => ex.name));
+    assert.ok(names.includes("Push-ups"));
+    assert.ok(!names.includes("Bench Press"));
+    assert.ok(!names.includes("Squat"));
+    const lower = buildSplitWorkout("lower", ["bodyweight"]);
+    assert.ok(lower.some((ex) => ex.name === "Bulgarian Split Squat" || ex.name === "Walking Lunge"));
+  });
+
+  test("recent history yields one personalized session that skips a recovering muscle", () => {
+    const workouts = [
+      {
+        id: "w1",
+        name: "Push",
+        completedAt: "2026-08-23T18:00:00Z",
+        exercises: [
+          {
+            name: "Bench Press",
+            sets: [
+              { weight: 135, reps: 8 },
+              { weight: 135, reps: 8 },
+              { weight: 135, reps: 8 },
+            ],
+          },
+        ],
+      },
+    ];
+    const suggestions = suggestWorkouts(workouts, { now: new Date("2026-08-24T12:00:00Z") });
+    assert.equal(suggestions.length, 1);
+    assert.equal(suggestions[0].kind, "personalized");
+    assert.ok(suggestions[0].exercises.length >= 4);
+    assert.ok(!suggestions[0].exercises.some((ex) => ex.name === "Bench Press"));
+  });
+
+  test("sessions older than the lookback window still get the three templates", () => {
+    const workouts = [
+      {
+        id: "old",
+        completedAt: "2026-08-01T12:00:00Z",
+        exercises: [{ name: "Squat", sets: [{ weight: 185, reps: 5 }] }],
+      },
+    ];
+    const now = new Date("2026-08-24T12:00:00Z");
+    const ageDays = (now - new Date(workouts[0].completedAt)) / 86400000;
+    assert.ok(ageDays > LOOKBACK_DAYS);
+    const suggestions = suggestWorkouts(workouts, { now });
+    assert.equal(suggestions.length, 3);
+  });
+});
+
+describe("saved library hide / templates", () => {
+  const history = [
+    {
+      id: "w1",
+      name: "Push Day",
+      completedAt: "2026-08-20T12:00:00Z",
+      exercises: [{ name: "Bench Press", sets: [{ weight: 135, reps: 8 }] }],
+    },
+  ];
+
+  test("hiding a workout removes it from the library but not from the history array", () => {
+    const hidden = hideWorkoutFromLibrary([], "w1");
+    const listed = visibleLibraryItems(history, hidden, []);
+    assert.equal(listed.length, 0);
+    assert.equal(history.length, 1);
+    assert.equal(computePersonalRecords(history)["Bench Press"].weight, 135);
+  });
+
+  test("saving a suggestion adds a template that can be removed without touching history", () => {
+    const suggestion = {
+      name: "Full body",
+      exercises: [{ name: "Push-ups", setCount: 3 }],
+    };
+    const templates = saveSuggestionTemplate([], suggestion, new Date("2026-08-24T12:00:00Z"));
+    assert.equal(templates.length, 1);
+    assert.equal(templates[0].name, "Full body");
+    assert.equal(templates[0].exercises[0].sets.length, 3);
+    const listed = visibleLibraryItems(history, [], templates);
+    assert.equal(listed[0].kind, "template");
+    assert.equal(visibleLibraryItems(history, [], removeTemplate(templates, templates[0].id)).length, 1);
+  });
+});
+
+describe("storage extras", () => {
+  test("serializeState keeps hidden ids, templates, and rest settings", () => {
+    const parsed = parseStoredState(
+      serializeState({
+        workouts: [{ id: "1", name: "Push", exercises: [] }],
+        hiddenIds: ["1"],
+        templates: [{ id: "t1", name: "Upper", exercises: [] }],
+        settings: { restSeconds: 120, equipmentIds: ["dumbbell"] },
+      })
+    );
+    assert.deepEqual(parsed.hiddenIds, ["1"]);
+    assert.equal(parsed.templates[0].id, "t1");
+    assert.equal(parsed.settings.restSeconds, 120);
+    assert.deepEqual(parsed.settings.equipmentIds, ["dumbbell"]);
+  });
+
+  test("unknown rest values fall back to the 90s default", () => {
+    const parsed = parseStoredState(
+      JSON.stringify({ workouts: [], settings: { restSeconds: 45, equipmentIds: ["laser"] } })
+    );
+    assert.equal(parsed.settings.restSeconds, 90);
+    assert.deepEqual(parsed.settings.equipmentIds, defaultEquipmentIds());
   });
 });

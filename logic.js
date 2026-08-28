@@ -5,7 +5,20 @@
 
 export const SETS_PER_EXERCISE = 3;
 export const DEFAULT_REST_SECONDS = 90;
+export const REST_PRESETS = [60, 90, 120];
 export const STORAGE_KEY = "workout-tracker-v1";
+export const LOOKBACK_DAYS = 7;
+export const RECOVERY_HOURS = 48;
+export const TIMER_ADJUST_SECONDS = 15;
+export const TIMER_MAX_SECONDS = 600;
+
+export const EQUIPMENT = [
+  { id: "barbell", label: "Barbell" },
+  { id: "dumbbell", label: "Dumbbell" },
+  { id: "machine", label: "Machine" },
+  { id: "cable", label: "Cable" },
+  { id: "bodyweight", label: "Bodyweight" },
+];
 
 /**
  * Primary muscle groups used to prefilter the exercise list.
@@ -26,102 +39,102 @@ export const MUSCLE_GROUPS = [
 
 export const EXERCISES = [
   // Chest
-  { name: "Bench Press", muscle: "chest" },
-  { name: "Incline Bench Press", muscle: "chest" },
-  { name: "Decline Bench Press", muscle: "chest" },
-  { name: "Dumbbell Bench Press", muscle: "chest" },
-  { name: "Incline Dumbbell Press", muscle: "chest" },
-  { name: "Chest Press Machine", muscle: "chest" },
-  { name: "Cable Fly", muscle: "chest" },
-  { name: "Dumbbell Fly", muscle: "chest" },
-  { name: "Pec Deck", muscle: "chest" },
-  { name: "Push-ups", muscle: "chest" },
-  { name: "Dips", muscle: "chest" },
+  { name: "Bench Press", muscle: "chest", equipment: ["barbell"] },
+  { name: "Incline Bench Press", muscle: "chest", equipment: ["barbell"] },
+  { name: "Decline Bench Press", muscle: "chest", equipment: ["barbell"] },
+  { name: "Dumbbell Bench Press", muscle: "chest", equipment: ["dumbbell"] },
+  { name: "Incline Dumbbell Press", muscle: "chest", equipment: ["dumbbell"] },
+  { name: "Chest Press Machine", muscle: "chest", equipment: ["machine"] },
+  { name: "Cable Fly", muscle: "chest", equipment: ["cable"] },
+  { name: "Dumbbell Fly", muscle: "chest", equipment: ["dumbbell"] },
+  { name: "Pec Deck", muscle: "chest", equipment: ["machine"] },
+  { name: "Push-ups", muscle: "chest", equipment: ["bodyweight"] },
+  { name: "Dips", muscle: "chest", equipment: ["bodyweight"] },
 
   // Back
-  { name: "Deadlift", muscle: "back" },
-  { name: "Barbell Row", muscle: "back" },
-  { name: "Dumbbell Row", muscle: "back" },
-  { name: "Seated Cable Row", muscle: "back" },
-  { name: "T-Bar Row", muscle: "back" },
-  { name: "Chest-Supported Row", muscle: "back" },
-  { name: "Pull-ups", muscle: "back" },
-  { name: "Chin-ups", muscle: "back" },
-  { name: "Lat Pulldown", muscle: "back" },
-  { name: "Straight-Arm Pulldown", muscle: "back" },
-  { name: "Inverted Row", muscle: "back" },
-  { name: "Shrugs", muscle: "back" },
+  { name: "Deadlift", muscle: "back", equipment: ["barbell"] },
+  { name: "Barbell Row", muscle: "back", equipment: ["barbell"] },
+  { name: "Dumbbell Row", muscle: "back", equipment: ["dumbbell"] },
+  { name: "Seated Cable Row", muscle: "back", equipment: ["cable"] },
+  { name: "T-Bar Row", muscle: "back", equipment: ["barbell"] },
+  { name: "Chest-Supported Row", muscle: "back", equipment: ["dumbbell"] },
+  { name: "Pull-ups", muscle: "back", equipment: ["bodyweight"] },
+  { name: "Chin-ups", muscle: "back", equipment: ["bodyweight"] },
+  { name: "Lat Pulldown", muscle: "back", equipment: ["cable"] },
+  { name: "Straight-Arm Pulldown", muscle: "back", equipment: ["cable"] },
+  { name: "Inverted Row", muscle: "back", equipment: ["bodyweight"] },
+  { name: "Shrugs", muscle: "back", equipment: ["barbell", "dumbbell"] },
 
   // Shoulders
-  { name: "Overhead Press", muscle: "shoulders" },
-  { name: "Dumbbell Shoulder Press", muscle: "shoulders" },
-  { name: "Arnold Press", muscle: "shoulders" },
-  { name: "Lateral Raise", muscle: "shoulders" },
-  { name: "Cable Lateral Raise", muscle: "shoulders" },
-  { name: "Front Raise", muscle: "shoulders" },
-  { name: "Rear Delt Fly", muscle: "shoulders" },
-  { name: "Face Pulls", muscle: "shoulders" },
-  { name: "Upright Row", muscle: "shoulders" },
+  { name: "Overhead Press", muscle: "shoulders", equipment: ["barbell"] },
+  { name: "Dumbbell Shoulder Press", muscle: "shoulders", equipment: ["dumbbell"] },
+  { name: "Arnold Press", muscle: "shoulders", equipment: ["dumbbell"] },
+  { name: "Lateral Raise", muscle: "shoulders", equipment: ["dumbbell"] },
+  { name: "Cable Lateral Raise", muscle: "shoulders", equipment: ["cable"] },
+  { name: "Front Raise", muscle: "shoulders", equipment: ["dumbbell"] },
+  { name: "Rear Delt Fly", muscle: "shoulders", equipment: ["dumbbell"] },
+  { name: "Face Pulls", muscle: "shoulders", equipment: ["cable"] },
+  { name: "Upright Row", muscle: "shoulders", equipment: ["barbell"] },
 
   // Biceps
-  { name: "Dumbbell Curl", muscle: "biceps" },
-  { name: "Barbell Curl", muscle: "biceps" },
-  { name: "Hammer Curl", muscle: "biceps" },
-  { name: "Preacher Curl", muscle: "biceps" },
-  { name: "Incline Dumbbell Curl", muscle: "biceps" },
-  { name: "Cable Curl", muscle: "biceps" },
-  { name: "Concentration Curl", muscle: "biceps" },
+  { name: "Dumbbell Curl", muscle: "biceps", equipment: ["dumbbell"] },
+  { name: "Barbell Curl", muscle: "biceps", equipment: ["barbell"] },
+  { name: "Hammer Curl", muscle: "biceps", equipment: ["dumbbell"] },
+  { name: "Preacher Curl", muscle: "biceps", equipment: ["barbell"] },
+  { name: "Incline Dumbbell Curl", muscle: "biceps", equipment: ["dumbbell"] },
+  { name: "Cable Curl", muscle: "biceps", equipment: ["cable"] },
+  { name: "Concentration Curl", muscle: "biceps", equipment: ["dumbbell"] },
 
   // Triceps
-  { name: "Tricep Pushdown", muscle: "triceps" },
-  { name: "Rope Pushdown", muscle: "triceps" },
-  { name: "Skull Crushers", muscle: "triceps" },
-  { name: "Overhead Tricep Extension", muscle: "triceps" },
-  { name: "Close-Grip Bench Press", muscle: "triceps" },
-  { name: "Tricep Dips", muscle: "triceps" },
-  { name: "Kickbacks", muscle: "triceps" },
+  { name: "Tricep Pushdown", muscle: "triceps", equipment: ["cable"] },
+  { name: "Rope Pushdown", muscle: "triceps", equipment: ["cable"] },
+  { name: "Skull Crushers", muscle: "triceps", equipment: ["barbell"] },
+  { name: "Overhead Tricep Extension", muscle: "triceps", equipment: ["dumbbell"] },
+  { name: "Close-Grip Bench Press", muscle: "triceps", equipment: ["barbell"] },
+  { name: "Tricep Dips", muscle: "triceps", equipment: ["bodyweight"] },
+  { name: "Kickbacks", muscle: "triceps", equipment: ["dumbbell"] },
 
   // Quads
-  { name: "Squat", muscle: "quads" },
-  { name: "Front Squat", muscle: "quads" },
-  { name: "Goblet Squat", muscle: "quads" },
-  { name: "Hack Squat", muscle: "quads" },
-  { name: "Leg Press", muscle: "quads" },
-  { name: "Bulgarian Split Squat", muscle: "quads" },
-  { name: "Walking Lunge", muscle: "quads" },
-  { name: "Leg Extension", muscle: "quads" },
-  { name: "Step-up", muscle: "quads" },
+  { name: "Squat", muscle: "quads", equipment: ["barbell"] },
+  { name: "Front Squat", muscle: "quads", equipment: ["barbell"] },
+  { name: "Goblet Squat", muscle: "quads", equipment: ["dumbbell"] },
+  { name: "Hack Squat", muscle: "quads", equipment: ["machine"] },
+  { name: "Leg Press", muscle: "quads", equipment: ["machine"] },
+  { name: "Bulgarian Split Squat", muscle: "quads", equipment: ["dumbbell", "bodyweight"] },
+  { name: "Walking Lunge", muscle: "quads", equipment: ["dumbbell", "bodyweight"] },
+  { name: "Leg Extension", muscle: "quads", equipment: ["machine"] },
+  { name: "Step-up", muscle: "quads", equipment: ["dumbbell", "bodyweight"] },
 
   // Hamstrings
-  { name: "Romanian Deadlift", muscle: "hamstrings" },
-  { name: "Stiff-Leg Deadlift", muscle: "hamstrings" },
-  { name: "Lying Leg Curl", muscle: "hamstrings" },
-  { name: "Seated Leg Curl", muscle: "hamstrings" },
-  { name: "Nordic Curl", muscle: "hamstrings" },
-  { name: "Good Morning", muscle: "hamstrings" },
+  { name: "Romanian Deadlift", muscle: "hamstrings", equipment: ["barbell"] },
+  { name: "Stiff-Leg Deadlift", muscle: "hamstrings", equipment: ["barbell"] },
+  { name: "Lying Leg Curl", muscle: "hamstrings", equipment: ["machine"] },
+  { name: "Seated Leg Curl", muscle: "hamstrings", equipment: ["machine"] },
+  { name: "Nordic Curl", muscle: "hamstrings", equipment: ["bodyweight"] },
+  { name: "Good Morning", muscle: "hamstrings", equipment: ["barbell"] },
 
   // Glutes
-  { name: "Hip Thrust", muscle: "glutes" },
-  { name: "Glute Bridge", muscle: "glutes" },
-  { name: "Sumo Deadlift", muscle: "glutes" },
-  { name: "Cable Kickback", muscle: "glutes" },
-  { name: "Hip Abduction", muscle: "glutes" },
-  { name: "Reverse Lunge", muscle: "glutes" },
+  { name: "Hip Thrust", muscle: "glutes", equipment: ["barbell"] },
+  { name: "Glute Bridge", muscle: "glutes", equipment: ["bodyweight"] },
+  { name: "Sumo Deadlift", muscle: "glutes", equipment: ["barbell"] },
+  { name: "Cable Kickback", muscle: "glutes", equipment: ["cable"] },
+  { name: "Hip Abduction", muscle: "glutes", equipment: ["machine"] },
+  { name: "Reverse Lunge", muscle: "glutes", equipment: ["dumbbell", "bodyweight"] },
 
   // Calves
-  { name: "Standing Calf Raise", muscle: "calves" },
-  { name: "Seated Calf Raise", muscle: "calves" },
-  { name: "Donkey Calf Raise", muscle: "calves" },
+  { name: "Standing Calf Raise", muscle: "calves", equipment: ["machine", "bodyweight"] },
+  { name: "Seated Calf Raise", muscle: "calves", equipment: ["machine"] },
+  { name: "Donkey Calf Raise", muscle: "calves", equipment: ["machine"] },
 
   // Core
-  { name: "Plank", muscle: "core" },
-  { name: "Side Plank", muscle: "core" },
-  { name: "Hanging Leg Raise", muscle: "core" },
-  { name: "Cable Crunch", muscle: "core" },
-  { name: "Ab Wheel", muscle: "core" },
-  { name: "Russian Twist", muscle: "core" },
-  { name: "Pallof Press", muscle: "core" },
-  { name: "Dead Bug", muscle: "core" },
+  { name: "Plank", muscle: "core", equipment: ["bodyweight"] },
+  { name: "Side Plank", muscle: "core", equipment: ["bodyweight"] },
+  { name: "Hanging Leg Raise", muscle: "core", equipment: ["bodyweight"] },
+  { name: "Cable Crunch", muscle: "core", equipment: ["cable"] },
+  { name: "Ab Wheel", muscle: "core", equipment: ["bodyweight"] },
+  { name: "Russian Twist", muscle: "core", equipment: ["bodyweight"] },
+  { name: "Pallof Press", muscle: "core", equipment: ["cable"] },
+  { name: "Dead Bug", muscle: "core", equipment: ["bodyweight"] },
 ];
 
 /**
@@ -166,6 +179,331 @@ export function filterRecordsByMuscle(records, muscleId, exercises = EXERCISES) 
     exercises.filter((ex) => ex.muscle === muscleId).map((ex) => ex.name)
   );
   return (records || []).filter((record) => names.has(record.name));
+}
+
+export function defaultEquipmentIds() {
+  return EQUIPMENT.map((item) => item.id);
+}
+
+export function defaultSettings() {
+  return {
+    restSeconds: DEFAULT_REST_SECONDS,
+    equipmentIds: defaultEquipmentIds(),
+  };
+}
+
+export function normalizeSettings(raw) {
+  const defaults = defaultSettings();
+  const rest = Number(raw?.restSeconds);
+  const restSeconds = REST_PRESETS.includes(rest) ? rest : defaults.restSeconds;
+  const allowed = new Set(defaultEquipmentIds());
+  const incoming = Array.isArray(raw?.equipmentIds)
+    ? raw.equipmentIds.filter((id) => allowed.has(id))
+    : defaults.equipmentIds;
+  return {
+    restSeconds,
+    equipmentIds: incoming.length ? [...new Set(incoming)] : defaults.equipmentIds,
+  };
+}
+
+export function hasAllEquipment(equipmentIds) {
+  const selected = new Set(equipmentIds || []);
+  return defaultEquipmentIds().every((id) => selected.has(id));
+}
+
+export function exerciseMatchesEquipment(exercise, equipmentIds) {
+  if (!equipmentIds || hasAllEquipment(equipmentIds)) return true;
+  const have = new Set(equipmentIds);
+  return (exercise.equipment || []).some((id) => have.has(id));
+}
+
+export function filterExercisesByEquipment(exercises = EXERCISES, equipmentIds) {
+  return (exercises || []).filter((ex) => exerciseMatchesEquipment(ex, equipmentIds));
+}
+
+export function filterCatalog(exercises, muscleId, equipmentIds) {
+  return filterExercisesByEquipment(
+    filterExercisesByMuscle(exercises, muscleId),
+    equipmentIds
+  );
+}
+
+export function toggleEquipmentId(currentIds, id) {
+  const allowed = new Set(defaultEquipmentIds());
+  if (!allowed.has(id)) return [...(currentIds || defaultEquipmentIds())];
+  // From "all gear", tapping one type means "I only have this" — the
+  // common bodyweight-only / dumbbells-only path. Further taps add or
+  // remove types. An empty selection falls back to all equipment.
+  if (hasAllEquipment(currentIds)) return [id];
+  const selected = new Set(currentIds || []);
+  if (selected.has(id)) {
+    selected.delete(id);
+  } else {
+    selected.add(id);
+  }
+  const next = defaultEquipmentIds().filter((item) => selected.has(item));
+  return next.length ? next : defaultEquipmentIds();
+}
+
+export function adjustTimerSeconds(current, delta, min = 0, max = TIMER_MAX_SECONDS) {
+  const next = (Number(current) || 0) + delta;
+  if (next < min) return min;
+  if (next > max) return max;
+  return next;
+}
+
+const ROLE_FALLBACKS = {
+  squat: ["Squat", "Goblet Squat", "Hack Squat", "Leg Press", "Bulgarian Split Squat", "Walking Lunge"],
+  hinge: ["Romanian Deadlift", "Stiff-Leg Deadlift", "Deadlift", "Good Morning", "Nordic Curl"],
+  hPush: ["Bench Press", "Dumbbell Bench Press", "Incline Dumbbell Press", "Chest Press Machine", "Push-ups", "Dips"],
+  hPull: ["Barbell Row", "Dumbbell Row", "Seated Cable Row", "Chest-Supported Row", "Inverted Row"],
+  vPush: ["Overhead Press", "Dumbbell Shoulder Press", "Arnold Press"],
+  vPull: ["Pull-ups", "Chin-ups", "Lat Pulldown"],
+  laterals: ["Lateral Raise", "Cable Lateral Raise"],
+  biceps: ["Dumbbell Curl", "Hammer Curl", "Barbell Curl", "Cable Curl", "Concentration Curl"],
+  triceps: ["Tricep Pushdown", "Rope Pushdown", "Overhead Tricep Extension", "Tricep Dips", "Close-Grip Bench Press"],
+  core: ["Plank", "Hanging Leg Raise", "Ab Wheel", "Pallof Press", "Dead Bug", "Side Plank"],
+  unilateral: ["Bulgarian Split Squat", "Walking Lunge", "Reverse Lunge", "Step-up"],
+  glute: ["Hip Thrust", "Glute Bridge", "Cable Kickback", "Hip Abduction", "Sumo Deadlift"],
+  hamIso: ["Lying Leg Curl", "Seated Leg Curl", "Nordic Curl"],
+  calves: ["Standing Calf Raise", "Seated Calf Raise", "Donkey Calf Raise"],
+};
+
+const TEMPLATE_SLOTS = {
+  fullBody: [
+    ["squat", "quads"],
+    ["hPush", "chest"],
+    ["hinge", "hamstrings"],
+    ["hPull", "back"],
+    ["vPush", "shoulders"],
+    ["core", "core"],
+  ],
+  upper: [
+    ["hPush", "chest"],
+    ["hPull", "back"],
+    ["vPush", "shoulders"],
+    ["vPull", "back"],
+    ["laterals", "shoulders"],
+    ["biceps", "biceps"],
+    ["triceps", "triceps"],
+  ],
+  lower: [
+    ["squat", "quads"],
+    ["hinge", "hamstrings"],
+    ["unilateral", "quads"],
+    ["glute", "glutes"],
+    ["hamIso", "hamstrings"],
+    ["calves", "calves"],
+  ],
+};
+
+const MUSCLE_PRIORITY = {
+  chest: ROLE_FALLBACKS.hPush,
+  back: ["Deadlift", ...ROLE_FALLBACKS.hPull, ...ROLE_FALLBACKS.vPull],
+  shoulders: [...ROLE_FALLBACKS.vPush, ...ROLE_FALLBACKS.laterals],
+  biceps: ROLE_FALLBACKS.biceps,
+  triceps: ROLE_FALLBACKS.triceps,
+  quads: [...ROLE_FALLBACKS.squat, ...ROLE_FALLBACKS.unilateral],
+  hamstrings: [...ROLE_FALLBACKS.hinge, ...ROLE_FALLBACKS.hamIso],
+  glutes: ROLE_FALLBACKS.glute,
+  calves: ROLE_FALLBACKS.calves,
+  core: ROLE_FALLBACKS.core,
+};
+
+function catalogByName(exercises = EXERCISES) {
+  return new Map((exercises || []).map((ex) => [ex.name, ex]));
+}
+
+export function pickExerciseForRole(role, equipmentIds, usedNames = new Set(), exercises = EXERCISES) {
+  const byName = catalogByName(exercises);
+  for (const name of ROLE_FALLBACKS[role] || []) {
+    if (usedNames.has(name)) continue;
+    const ex = byName.get(name);
+    if (ex && exerciseMatchesEquipment(ex, equipmentIds)) return ex;
+  }
+  return null;
+}
+
+export function buildSplitWorkout(kind, equipmentIds, exercises = EXERCISES) {
+  const slots = TEMPLATE_SLOTS[kind] || [];
+  const used = new Set();
+  const picked = [];
+  for (const [role] of slots) {
+    const ex = pickExerciseForRole(role, equipmentIds, used, exercises);
+    if (!ex) continue;
+    used.add(ex.name);
+    picked.push({ name: ex.name, setCount: SETS_PER_EXERCISE });
+  }
+  return picked;
+}
+
+function hoursBetween(iso, now) {
+  const then = new Date(iso).getTime();
+  if (Number.isNaN(then)) return Infinity;
+  return (now.getTime() - then) / 3_600_000;
+}
+
+export function muscleTrainingStats(workouts, now = new Date(), exercises = EXERCISES) {
+  const cutoff = now.getTime() - LOOKBACK_DAYS * 24 * 3_600_000;
+  const stats = {};
+  for (const group of MUSCLE_GROUPS) {
+    stats[group.id] = { muscle: group.id, weeklySets: 0, lastTrainedAt: null };
+  }
+
+  for (const workout of workouts || []) {
+    if (!workout?.completedAt) continue;
+    const at = new Date(workout.completedAt);
+    if (Number.isNaN(at.getTime())) continue;
+    const recent = at.getTime() >= cutoff;
+    for (const ex of workout.exercises || []) {
+      const muscle = getMuscleForExercise(ex.name, exercises);
+      if (!muscle || !stats[muscle]) continue;
+      const loggedSets = (ex.sets || []).filter(isLoggedSet).length || (ex.sets || []).length;
+      if (recent) stats[muscle].weeklySets += loggedSets;
+      if (!stats[muscle].lastTrainedAt || at > new Date(stats[muscle].lastTrainedAt)) {
+        stats[muscle].lastTrainedAt = workout.completedAt;
+      }
+    }
+  }
+  return stats;
+}
+
+function muscleNeedScore(stat, now) {
+  const hours = stat.lastTrainedAt ? hoursBetween(stat.lastTrainedAt, now) : LOOKBACK_DAYS * 24;
+  const recovering = hours < RECOVERY_HOURS;
+  const recency = Math.min(hours / 24, LOOKBACK_DAYS);
+  let score = recency * 10 - stat.weeklySets;
+  if (recovering) score -= 50;
+  return score;
+}
+
+export function buildPersonalizedWorkout(workouts, equipmentIds, now = new Date(), exercises = EXERCISES) {
+  const stats = muscleTrainingStats(workouts, now, exercises);
+  const ranked = MUSCLE_GROUPS.map((group) => ({
+    ...group,
+    ...stats[group.id],
+    score: muscleNeedScore(stats[group.id], now),
+  })).sort((a, b) => b.score - a.score);
+
+  const TARGET_EXERCISES = 6;
+  const used = new Set();
+  const picked = [];
+  const chosen = [];
+  const byName = catalogByName(exercises);
+
+  for (const target of ranked) {
+    if (picked.length >= TARGET_EXERCISES) break;
+    if (target.score <= -20) continue;
+    const remaining = TARGET_EXERCISES - picked.length;
+    const want = target.weeklySets < 10 && remaining >= 2 ? 2 : 1;
+    let added = 0;
+    for (const name of MUSCLE_PRIORITY[target.id] || []) {
+      if (added >= want || picked.length >= TARGET_EXERCISES) break;
+      const ex = byName.get(name);
+      if (!ex || used.has(ex.name) || !exerciseMatchesEquipment(ex, equipmentIds)) continue;
+      used.add(ex.name);
+      picked.push({ name: ex.name, setCount: SETS_PER_EXERCISE });
+      added += 1;
+    }
+    if (added) chosen.push(target);
+  }
+
+  const labels = chosen
+    .slice(0, 4)
+    .map((m) => m.label.toLowerCase())
+    .join(", ");
+  return {
+    kind: "personalized",
+    name: "Suggested session",
+    reason: labels
+      ? `Hypertrophy work is more effective at ~10–20 sets/muscle/week, trained ~2×/week, with ~48h between hard sessions. Right now ${labels} look most under-trained.`
+      : "Hypertrophy work is more effective when each muscle is trained about twice a week. This session spreads compounds across lagging groups.",
+    exercises: picked,
+  };
+}
+
+export function suggestWorkouts(workouts, { equipmentIds, now = new Date(), exercises = EXERCISES } = {}) {
+  const equipment = equipmentIds || defaultEquipmentIds();
+  const cutoff = now.getTime() - LOOKBACK_DAYS * 24 * 3_600_000;
+  const recent = (workouts || []).filter((w) => {
+    if (!w?.completedAt) return false;
+    const at = new Date(w.completedAt).getTime();
+    return !Number.isNaN(at) && at >= cutoff;
+  });
+
+  const pack = (kind, name, reason) => ({
+    kind,
+    name,
+    reason,
+    exercises: buildSplitWorkout(kind, equipment, exercises),
+  });
+
+  if (recent.length === 0) {
+    return [
+      pack(
+        "fullBody",
+        "Full body",
+        "No sessions in the last week. A full-body workout trains each muscle once — a reliable hypertrophy default until you have more history."
+      ),
+      pack(
+        "upper",
+        "Upper body",
+        "Push, pull, and arms. Pair with a lower-body day later in the week so each muscle can hit ~2 sessions."
+      ),
+      pack(
+        "lower",
+        "Lower body",
+        "Squat, hinge, and unilateral work. Frequency of 2x/week per muscle beats cramming all sets into one day."
+      ),
+    ].filter((item) => item.exercises.length > 0);
+  }
+
+  const personalized = buildPersonalizedWorkout(workouts, equipment, now, exercises);
+  return personalized.exercises.length ? [personalized] : [
+    pack("fullBody", "Full body", "Not enough matching exercises for a custom split with current equipment."),
+  ];
+}
+
+export function exercisesFromSuggestion(suggestion, workouts = []) {
+  return (suggestion?.exercises || []).map((item) =>
+    createExercise(item.name, item.setCount || SETS_PER_EXERCISE, getPreviousSets(workouts, item.name))
+  );
+}
+
+export function visibleLibraryItems(workouts, hiddenIds, templates) {
+  const hidden = new Set(hiddenIds || []);
+  const savedTemplates = (templates || []).map((item) => ({ ...item, kind: "template" }));
+  const listed = (workouts || [])
+    .filter((item) => item?.id && !hidden.has(item.id))
+    .map((item) => ({ ...item, kind: "history" }));
+  return [...savedTemplates, ...listed];
+}
+
+export function hideWorkoutFromLibrary(hiddenIds, id) {
+  if (!id) return [...(hiddenIds || [])];
+  if ((hiddenIds || []).includes(id)) return [...hiddenIds];
+  return [...(hiddenIds || []), id];
+}
+
+export function saveSuggestionTemplate(templates, suggestion, now = new Date()) {
+  const exercises = (suggestion?.exercises || []).map((item) => ({
+    name: item.name,
+    sets: Array.from({ length: item.setCount || SETS_PER_EXERCISE }, () => ({
+      weight: null,
+      reps: null,
+    })),
+  }));
+  const template = {
+    id: createId(),
+    name: suggestion?.name || "Saved workout",
+    savedAt: now.toISOString(),
+    exercises,
+  };
+  return [template, ...(templates || [])];
+}
+
+export function removeTemplate(templates, id) {
+  return (templates || []).filter((item) => item.id !== id);
 }
 
 /**
@@ -557,18 +895,43 @@ export function formatLoad(weight, reps) {
 }
 
 export function parseStoredState(raw) {
-  if (!raw) return { workouts: [] };
+  const empty = {
+    workouts: [],
+    hiddenIds: [],
+    templates: [],
+    settings: defaultSettings(),
+  };
+  if (!raw) return empty;
   try {
     const data = typeof raw === "string" ? JSON.parse(raw) : raw;
-    if (!data || !Array.isArray(data.workouts)) return { workouts: [] };
-    return { workouts: data.workouts };
+    if (!data || !Array.isArray(data.workouts)) return empty;
+    return {
+      workouts: data.workouts,
+      hiddenIds: Array.isArray(data.hiddenIds) ? data.hiddenIds.filter((id) => typeof id === "string") : [],
+      templates: Array.isArray(data.templates) ? data.templates : [],
+      settings: normalizeSettings(data.settings),
+    };
   } catch {
-    return { workouts: [] };
+    return empty;
   }
 }
 
-export function serializeState(workouts) {
-  return JSON.stringify({ workouts: workouts || [] });
+export function serializeState(workoutsOrState) {
+  if (Array.isArray(workoutsOrState)) {
+    return JSON.stringify({
+      workouts: workoutsOrState,
+      hiddenIds: [],
+      templates: [],
+      settings: defaultSettings(),
+    });
+  }
+  const settings = normalizeSettings(workoutsOrState?.settings);
+  return JSON.stringify({
+    workouts: workoutsOrState?.workouts || [],
+    hiddenIds: workoutsOrState?.hiddenIds || [],
+    templates: workoutsOrState?.templates || [],
+    settings,
+  });
 }
 
 export const EXPORT_APP_ID = "workout-tracker";
@@ -599,12 +962,15 @@ export function exportFilename(date = new Date()) {
   return `workout-tracker-${y}-${m}-${d}.json`;
 }
 
-export function buildExportPayload(workouts, exportedAt = new Date().toISOString()) {
+export function buildExportPayload(workouts, exportedAt = new Date().toISOString(), extra = {}) {
   return {
     app: EXPORT_APP_ID,
     version: EXPORT_FORMAT_VERSION,
     exportedAt,
     workouts: (workouts || []).map(normalizeWorkout).filter(Boolean),
+    hiddenIds: extra.hiddenIds || [],
+    templates: extra.templates || [],
+    settings: normalizeSettings(extra.settings),
   };
 }
 
@@ -638,6 +1004,9 @@ export function parseImportPayload(raw) {
   return {
     ok: true,
     workouts,
+    hiddenIds: Array.isArray(data?.hiddenIds) ? data.hiddenIds : [],
+    templates: Array.isArray(data?.templates) ? data.templates : [],
+    settings: data?.settings ? normalizeSettings(data.settings) : null,
     exportedAt: typeof data?.exportedAt === "string" ? data.exportedAt : null,
   };
 }
