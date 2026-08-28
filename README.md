@@ -1,5 +1,7 @@
 # Workout Tracker
 
+**[Open the app](https://nicolaspenam.github.io/WorkoutTracker/)** — https://nicolaspenam.github.io/WorkoutTracker/
+
 A simple, mobile-friendly workout tracker built with vanilla HTML, CSS, and JavaScript. Workouts are saved in your browser (`localStorage`) so you can reuse them and track PRs over time.
 
 ## Features
@@ -17,7 +19,7 @@ A simple, mobile-friendly workout tracker built with vanilla HTML, CSS, and Java
 
 ## Live site
 
-https://nicolaspenam.github.io/WorkoutTracker/
+Production: **[https://nicolaspenam.github.io/WorkoutTracker/](https://nicolaspenam.github.io/WorkoutTracker/)**
 
 Pull requests get a preview of the same site. A GitHub Action posts the link (and a QR code for your phone) on the PR:
 
