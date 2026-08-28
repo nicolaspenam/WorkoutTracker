@@ -5,6 +5,7 @@ A simple, mobile-friendly workout tracker built with vanilla HTML, CSS, and Java
 ## Features
 
 - Build a workout from a dropdown, or reuse a previous session from **History**
+- Filter the (expanded) exercise list by main muscle: chest, back, shoulders, arms, legs, glutes, calves, core
 - Optional name for each workout (e.g. “Push Day”)
 - Log weight and reps per set, with add/remove set controls
 - See last time’s weight/reps for each set and tap **✓** to copy them
@@ -36,12 +37,12 @@ Then open the URL in your phone or browser.
 
 ## Usage
 
-1. Optionally name the workout, then add exercises — or open **History** and tap **Use workout**
+1. Optionally name the workout, then add exercises — pick a muscle chip first to narrow the list, or open **History** and tap **Use workout**
 2. Tap **Start Workout**
 3. Enter weight and reps, or tap **✓** to fill last time’s numbers for that set
 4. Use **+** / **−** to add or remove sets
 5. **Finish Workout** saves the session and updates PRs
-6. Search an exercise on the **PRs** tab to see your best set
+6. Search an exercise on the **PRs** tab (or filter by muscle) to see your best set
 7. On **History**, use **Export backup** to download a JSON file (save it to Drive/iCloud). **Import backup** restores it — merge keeps existing sessions, replace overwrites this device
 
 ## Tests
