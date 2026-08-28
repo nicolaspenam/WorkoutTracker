@@ -52,7 +52,8 @@ import {
   exercisesFromSuggestion,
   groupedWorkoutItems,
   togglePairWithNext,
-  moveExercise,
+  moveWorkoutBlock,
+  swapSupersetPartners,
   normalizeSupersetAdjacency,
   shouldStartRestTimer,
   restNotificationPayload,
@@ -670,58 +671,72 @@ function muscleCaption(name) {
   return muscleId ? getMuscleLabel(muscleId) : "";
 }
 
-function renderBuilderRow(index, { inSuperset = false } = {}) {
+function builderNameEl(index) {
   const item = selectedExercises[index];
-  const row = document.createElement("div");
-  row.className = "builder-exercise-row";
-
   const left = document.createElement("span");
   left.className = "name";
   const muscleName = muscleCaption(item.name);
   left.innerHTML = `<span class="index">${index + 1}.</span>${item.name}${
     muscleName ? `<span class="muscle">${muscleName}</span>` : ""
   }`;
+  return left;
+}
+
+function tinyButton(label, { ariaLabel, active = false, disabled = false, onClick } = {}) {
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "btn-tiny" + (active ? " active" : "");
+  btn.textContent = label;
+  if (ariaLabel) btn.setAttribute("aria-label", ariaLabel);
+  btn.disabled = !!disabled;
+  if (onClick) btn.addEventListener("click", onClick);
+  return btn;
+}
+
+function appendBlockMoveButtons(actions, groupIndex, groupCount, label) {
+  actions.appendChild(
+    tinyButton("↑", {
+      ariaLabel: `Move ${label} up`,
+      disabled: groupIndex === 0,
+      onClick: () => {
+        selectedExercises = moveWorkoutBlock(selectedExercises, groupIndex, -1);
+        renderExerciseList();
+      },
+    })
+  );
+  actions.appendChild(
+    tinyButton("↓", {
+      ariaLabel: `Move ${label} down`,
+      disabled: groupIndex === groupCount - 1,
+      onClick: () => {
+        selectedExercises = moveWorkoutBlock(selectedExercises, groupIndex, 1);
+        renderExerciseList();
+      },
+    })
+  );
+}
+
+function renderBuilderSingle(index, groupIndex, groupCount) {
+  const item = selectedExercises[index];
+  const row = document.createElement("div");
+  row.className = "builder-exercise-row";
+  row.appendChild(builderNameEl(index));
 
   const actions = document.createElement("div");
   actions.className = "builder-actions";
-
-  const upBtn = document.createElement("button");
-  upBtn.type = "button";
-  upBtn.className = "btn-tiny";
-  upBtn.textContent = "↑";
-  upBtn.setAttribute("aria-label", `Move ${item.name} up`);
-  upBtn.disabled = index === 0;
-  upBtn.addEventListener("click", () => {
-    selectedExercises = moveExercise(selectedExercises, index, -1);
-    renderExerciseList();
-  });
-
-  const downBtn = document.createElement("button");
-  downBtn.type = "button";
-  downBtn.className = "btn-tiny";
-  downBtn.textContent = "↓";
-  downBtn.setAttribute("aria-label", `Move ${item.name} down`);
-  downBtn.disabled = index === selectedExercises.length - 1;
-  downBtn.addEventListener("click", () => {
-    selectedExercises = moveExercise(selectedExercises, index, 1);
-    renderExerciseList();
-  });
-
-  actions.appendChild(upBtn);
-  actions.appendChild(downBtn);
+  appendBlockMoveButtons(actions, groupIndex, groupCount, item.name);
 
   const next = selectedExercises[index + 1];
-  const pairedWithNext = !!(item.supersetId && next && item.supersetId === next.supersetId);
-  if (index < selectedExercises.length - 1 && (!inSuperset || pairedWithNext)) {
-    const pairBtn = document.createElement("button");
-    pairBtn.type = "button";
-    pairBtn.className = "btn-tiny" + (pairedWithNext ? " active" : "");
-    pairBtn.textContent = pairedWithNext ? "Unpair" : "Superset with next";
-    pairBtn.addEventListener("click", () => {
-      selectedExercises = togglePairWithNext(selectedExercises, index);
-      renderExerciseList();
-    });
-    actions.appendChild(pairBtn);
+  const nextIsFree = next && !next.supersetId && !item.supersetId;
+  if (nextIsFree) {
+    actions.appendChild(
+      tinyButton("Superset with next", {
+        onClick: () => {
+          selectedExercises = togglePairWithNext(selectedExercises, index);
+          renderExerciseList();
+        },
+      })
+    );
   }
 
   const removeBtn = document.createElement("button");
@@ -731,9 +746,62 @@ function renderBuilderRow(index, { inSuperset = false } = {}) {
   removeBtn.addEventListener("click", () => removeExercise(index));
   actions.appendChild(removeBtn);
 
-  row.appendChild(left);
   row.appendChild(actions);
   return row;
+}
+
+function renderBuilderPair(group, groupIndex, groupCount) {
+  const wrap = document.createElement("div");
+  wrap.className = "builder-superset";
+
+  const header = document.createElement("div");
+  header.className = "builder-block-header";
+  const badge = document.createElement("div");
+  badge.className = "superset-badge";
+  badge.textContent = "Superset";
+  const actions = document.createElement("div");
+  actions.className = "builder-actions";
+  const label = `${group.exercises[0].name} + ${group.exercises[1].name}`;
+  appendBlockMoveButtons(actions, groupIndex, groupCount, label);
+  actions.appendChild(
+    tinyButton("Swap order", {
+      ariaLabel: `Swap order of ${label}`,
+      onClick: () => {
+        selectedExercises = swapSupersetPartners(selectedExercises, group.indices[0]);
+        renderExerciseList();
+      },
+    })
+  );
+  actions.appendChild(
+    tinyButton("Unpair", {
+      active: true,
+      onClick: () => {
+        selectedExercises = togglePairWithNext(selectedExercises, group.indices[0]);
+        renderExerciseList();
+      },
+    })
+  );
+  header.appendChild(badge);
+  header.appendChild(actions);
+  wrap.appendChild(header);
+
+  group.indices.forEach((index) => {
+    const row = document.createElement("div");
+    row.className = "builder-exercise-row";
+    row.appendChild(builderNameEl(index));
+    const rowActions = document.createElement("div");
+    rowActions.className = "builder-actions";
+    const removeBtn = document.createElement("button");
+    removeBtn.type = "button";
+    removeBtn.className = "btn btn-danger";
+    removeBtn.textContent = "Remove";
+    removeBtn.addEventListener("click", () => removeExercise(index));
+    rowActions.appendChild(removeBtn);
+    row.appendChild(rowActions);
+    wrap.appendChild(row);
+  });
+
+  return wrap;
 }
 
 function renderExerciseList() {
@@ -748,20 +816,15 @@ function renderExerciseList() {
     return;
   }
 
-  groupedWorkoutItems(selectedExercises).forEach((group) => {
+  const groups = groupedWorkoutItems(selectedExercises);
+  groups.forEach((group, groupIndex) => {
     const li = document.createElement("li");
     if (group.kind === "superset") {
       li.className = "exercise-list-item is-superset";
-      const badge = document.createElement("div");
-      badge.className = "superset-badge";
-      badge.textContent = "Superset";
-      li.appendChild(badge);
-      group.indices.forEach((index) => {
-        li.appendChild(renderBuilderRow(index, { inSuperset: true }));
-      });
+      li.appendChild(renderBuilderPair(group, groupIndex, groups.length));
     } else {
       li.className = "exercise-list-item";
-      li.appendChild(renderBuilderRow(group.indices[0]));
+      li.appendChild(renderBuilderSingle(group.indices[0], groupIndex, groups.length));
     }
     exerciseList.appendChild(li);
   });

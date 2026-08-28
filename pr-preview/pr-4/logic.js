@@ -565,6 +565,36 @@ export function groupedWorkoutItems(exercises) {
   return groups;
 }
 
+function cloneExercises(exercises) {
+  return (exercises || []).map((ex) => ({ ...ex }));
+}
+
+/** Move a single or a whole superset as one block. `delta` is in groups, not lifts. */
+export function moveWorkoutBlock(exercises, groupIndex, delta) {
+  const groups = groupedWorkoutItems(exercises);
+  const to = groupIndex + delta;
+  if (groupIndex < 0 || to < 0 || groupIndex >= groups.length || to >= groups.length) {
+    return cloneExercises(exercises);
+  }
+  const next = groups.slice();
+  const [group] = next.splice(groupIndex, 1);
+  next.splice(to, 0, group);
+  return next.flatMap((item) => item.exercises.map((ex) => ({ ...ex })));
+}
+
+/** Swap the two lifts inside a pair. `index` can be either partner. */
+export function swapSupersetPartners(exercises, index) {
+  const partner = findSupersetPartnerIndex(exercises, index);
+  if (partner == null) return cloneExercises(exercises);
+  const list = cloneExercises(exercises);
+  const a = Math.min(index, partner);
+  const b = Math.max(index, partner);
+  const tmp = list[a];
+  list[a] = list[b];
+  list[b] = tmp;
+  return list;
+}
+
 export function togglePairWithNext(exercises, index) {
   const list = (exercises || []).map((ex) => ({ ...ex }));
   if (index < 0 || index >= list.length - 1) return list;
@@ -588,12 +618,10 @@ export function togglePairWithNext(exercises, index) {
 }
 
 export function moveExercise(exercises, from, delta) {
-  const list = (exercises || []).slice();
-  const to = from + delta;
-  if (from < 0 || to < 0 || from >= list.length || to >= list.length) return list;
-  const [item] = list.splice(from, 1);
-  list.splice(to, 0, item);
-  return normalizeSupersetAdjacency(list);
+  const groups = groupedWorkoutItems(exercises);
+  const groupIndex = groups.findIndex((group) => group.indices.includes(from));
+  if (groupIndex < 0) return cloneExercises(exercises);
+  return moveWorkoutBlock(exercises, groupIndex, delta);
 }
 
 export function normalizeSupersetAdjacency(exercises) {
