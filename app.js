@@ -383,7 +383,7 @@ function loadText(weight, reps) {
 
 function setLine(set) {
   const load = loadText(set.weight, set.reps);
-  return set.rpe != null ? `Set ${set.set}: ${load} @ RPE ${set.rpe}` : `Set ${set.set}: ${load}`;
+  return set.rpe != null ? `Set ${set.set}: ${load} · effort ${set.rpe}` : `Set ${set.set}: ${load}`;
 }
 
 function restNotificationOptions(payload, extra = {}) {
@@ -1512,16 +1512,23 @@ function renderExerciseBlock(item, exerciseIndex, prs) {
     rpeInput.max = "10";
     rpeInput.step = "0.5";
     rpeInput.inputMode = "decimal";
-    rpeInput.placeholder = setData.previousRpe != null ? `RPE ${setData.previousRpe}` : "RPE";
+    rpeInput.placeholder = setData.previousRpe != null ? String(setData.previousRpe) : "1–10";
     rpeInput.value = setData.rpe || "";
-    rpeInput.setAttribute("aria-label", `${item.name} set ${setNum} RPE`);
+    rpeInput.setAttribute("aria-label", `${item.name} set ${setNum} effort, 1 easy to 10 max`);
     rpeInput.addEventListener("input", (e) => {
       updateSetField(setData, "rpe", e.target.value);
     });
+    const rpeWrap = document.createElement("label");
+    rpeWrap.className = "rpe-field";
+    const rpeCaption = document.createElement("span");
+    rpeCaption.className = "rpe-label";
+    rpeCaption.textContent = "Effort";
+    rpeWrap.appendChild(rpeCaption);
+    rpeWrap.appendChild(rpeInput);
     prevRow.appendChild(spacer);
     prevRow.appendChild(prevWeight);
     prevRow.appendChild(prevReps);
-    prevRow.appendChild(rpeInput);
+    prevRow.appendChild(rpeWrap);
 
     group.appendChild(row);
     group.appendChild(prevRow);
@@ -1542,6 +1549,11 @@ function renderSetsForm() {
     <span><span class="legend-swatch typed"></span>Typed / confirmed</span>
   `;
   setsContainer.appendChild(legend);
+
+  const effortHelp = document.createElement("p");
+  effortHelp.className = "legend rest-superset-note";
+  effortHelp.textContent = "Effort is optional (1 easy – 10 could not do another rep). It does not start rest.";
+  setsContainer.appendChild(effortHelp);
 
   const note = document.createElement("p");
   note.className = "legend rest-superset-note";
