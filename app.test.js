@@ -88,6 +88,7 @@ import {
   hideWorkoutFromLibrary,
   visibleLibraryItems,
 } from "./logic.js";
+import { EXERCISE_GUIDES, getExerciseGuide, isGuideComplete } from "./guides.js";
 
 // ─── formatTime ───────────────────────────────────────────────────────────────
 
@@ -1338,5 +1339,29 @@ describe("storage extras", () => {
     );
     assert.equal(parsed.settings.restSeconds, 90);
     assert.deepEqual(parsed.settings.equipmentIds, defaultEquipmentIds());
+  });
+});
+
+describe("exercise form guides", () => {
+  test("every catalog lift has a complete guide", () => {
+    const names = EXERCISES.map((ex) => ex.name);
+    assert.equal(Object.keys(EXERCISE_GUIDES).length, names.length);
+    for (const name of names) {
+      const guide = getExerciseGuide(name);
+      assert.ok(guide, `missing guide for ${name}`);
+      assert.equal(isGuideComplete(guide), true, `incomplete guide for ${name}`);
+    }
+  });
+
+  test("unknown names have no guide", () => {
+    assert.equal(getExerciseGuide("Laser Curl"), null);
+    assert.equal(getExerciseGuide(""), null);
+  });
+
+  test("bench press covers a tucked-elbow path and no bounce", () => {
+    const guide = getExerciseGuide("Bench Press");
+    assert.match(guide.summary, /chest/i);
+    assert.ok(guide.steps.some((step) => /45|tuck|elbow/i.test(step)));
+    assert.ok(guide.mistakes.some((item) => /bounc/i.test(item)));
   });
 });

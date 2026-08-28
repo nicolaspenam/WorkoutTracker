@@ -13,7 +13,7 @@ A simple, mobile-friendly workout tracker built with vanilla HTML, CSS, and Java
 - Build your own supersets while assembling a workout (pairs of two, moved as one block); saved workouts keep order and pairing
 - Rest timer starts when a set is completed — pick **1:00 / 1:30 / 2:00**, and nudge **±15s** while it runs. In a superset the timer waits until **both** lifts finish that set
 - Optional **rest-over notification** (on by default): allow notifications and the phone will ping when rest hits 0:00, aimed at Android PWAs (iOS installed apps too when the OS allows it)
-- Log weight and reps per set, with add/remove set controls
+- Tap an exercise **i** to open a short form guide (setup steps and common mistakes), then **Back** to return
 - **Swap** an exercise in the middle of a session (or add one). If you started from a saved workout, Finish asks whether to update it for next time — history and PRs stay as logged
 - See last time’s weight/reps for each set and tap **✓** to copy them
 - Previous numbers stay in amber; values you type or confirm use a green style
@@ -47,11 +47,12 @@ Then open the URL in your phone or browser. In Chrome on Android, use **Install 
 
 1. Optionally name the workout, then add exercises — pick equipment and/or a muscle chip first to narrow the list, use a suggestion, or open **History** and tap **Use workout**. Pair adjacent lifts with **Superset with next**
 2. Allow rest notifications if prompted, then tap **Start Workout**
-3. Enter weight and reps, or tap **✓** to fill last time’s numbers for that set
-4. Use **+** / **−** to add or remove sets; rest defaults to 1:30 and can be changed or nudged ±15s. In a superset, rest starts after both sides finish that set. You can still reorder, pair, or unpair during the session (↑↓ or the drag handle; a pair moves as one block)
-5. **Finish Workout** saves the session (including order and supersets) and updates PRs
-6. Search an exercise on the **PRs** tab (or filter by muscle) to see your best set
-7. On **History**, **Remove** hides a workout from the list only. Use **Export backup** to download a JSON file (save it to Drive/iCloud). **Import backup** restores it — merge keeps existing sessions, replace overwrites this device
+3. Tap an exercise name (the **i**) anytime for a short form guide, then **Back**
+4. Enter weight and reps, or tap **✓** to fill last time’s numbers for that set
+5. Use **+** / **−** to add or remove sets; rest defaults to 1:30 and can be changed or nudged ±15s. In a superset, rest starts after both sides finish that set. You can still reorder, pair, or unpair during the session (↑↓ or the drag handle; a pair moves as one block)
+6. **Finish Workout** saves the session (including order and supersets) and updates PRs
+7. Search an exercise on the **PRs** tab (or filter by muscle) to see your best set
+8. On **History**, **Remove** hides a workout from the list only. Use **Export backup** to download a JSON file (save it to Drive/iCloud). **Import backup** restores it — merge keeps existing sessions, replace overwrites this device
 
 ## Tests
 
