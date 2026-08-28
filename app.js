@@ -296,29 +296,11 @@ function startRestTimer(duration = restSeconds) {
 }
 
 function nudgeTimer(delta) {
-  const wasFinished = restTimerBar.classList.contains("finished") || timerSecondsLeft <= 0;
-  const next = adjustTimerSeconds(timerSecondsLeft, delta);
-  if (restTimerBar.classList.contains("hidden")) {
-    startRestTimer(next || restSeconds);
-    return;
-  }
-  if (wasFinished && next > 0) {
-    startRestTimer(next);
-    return;
-  }
-  timerSecondsLeft = next;
-  timerDisplay.textContent = formatTime(timerSecondsLeft);
-  if (timerSecondsLeft <= 0) {
-    if (timerInterval) {
-      clearInterval(timerInterval);
-      timerInterval = null;
-    }
-    timerSecondsLeft = 0;
-    timerDisplay.textContent = "0:00";
-    restTimerBar.classList.add("finished");
-    return;
-  }
-  restTimerBar.classList.remove("finished");
+  const current = restTimerBar.classList.contains("hidden")
+    ? restSeconds
+    : timerSecondsLeft;
+  const next = adjustTimerSeconds(current, delta);
+  startRestTimer(next);
 }
 
 function stopRestTimer() {
