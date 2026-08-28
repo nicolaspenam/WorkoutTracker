@@ -54,6 +54,9 @@ import {
   togglePairWithNext,
   moveWorkoutBlock,
   swapSupersetPartners,
+  dropWorkoutBlock,
+  dropPlaceFromOffset,
+  canPairWithNext,
   normalizeSupersetAdjacency,
   shouldStartRestTimer,
   restNotificationPayload,
@@ -693,96 +696,187 @@ function tinyButton(label, { ariaLabel, active = false, disabled = false, onClic
   return btn;
 }
 
+function refreshWorkoutStructure() {
+  if (!trackPhase.classList.contains("hidden")) {
+    renderSetsForm();
+  } else {
+    renderExerciseList();
+  }
+}
+
+function applyBlockChange(next) {
+  if (restNotifyContext) {
+    const name = selectedExercises[restNotifyContext.exerciseIndex]?.name;
+    const idx = name ? next.findIndex((ex) => ex.name === name) : -1;
+    if (idx >= 0) restNotifyContext = { ...restNotifyContext, exerciseIndex: idx };
+  }
+  selectedExercises = next;
+  refreshWorkoutStructure();
+}
+
 function appendBlockMoveButtons(actions, groupIndex, groupCount, label) {
   actions.appendChild(
     tinyButton("↑", {
       ariaLabel: `Move ${label} up`,
       disabled: groupIndex === 0,
-      onClick: () => {
-        selectedExercises = moveWorkoutBlock(selectedExercises, groupIndex, -1);
-        renderExerciseList();
-      },
+      onClick: () => applyBlockChange(moveWorkoutBlock(selectedExercises, groupIndex, -1)),
     })
   );
   actions.appendChild(
     tinyButton("↓", {
       ariaLabel: `Move ${label} down`,
       disabled: groupIndex === groupCount - 1,
-      onClick: () => {
-        selectedExercises = moveWorkoutBlock(selectedExercises, groupIndex, 1);
-        renderExerciseList();
-      },
+      onClick: () => applyBlockChange(moveWorkoutBlock(selectedExercises, groupIndex, 1)),
     })
   );
 }
 
-function renderBuilderSingle(index, groupIndex, groupCount) {
-  const item = selectedExercises[index];
-  const row = document.createElement("div");
-  row.className = "builder-exercise-row";
-  row.appendChild(builderNameEl(index));
+function appendPairActions(actions, group) {
+  const label = `${group.exercises[0].name} + ${group.exercises[1].name}`;
+  actions.appendChild(
+    tinyButton("Swap order", {
+      ariaLabel: `Swap order of ${label}`,
+      onClick: () => applyBlockChange(swapSupersetPartners(selectedExercises, group.indices[0])),
+    })
+  );
+  actions.appendChild(
+    tinyButton("Unpair", {
+      active: true,
+      onClick: () => applyBlockChange(togglePairWithNext(selectedExercises, group.indices[0])),
+    })
+  );
+}
 
+function createDragHandle(groupIndex) {
+  const handle = document.createElement("button");
+  handle.type = "button";
+  handle.className = "drag-handle";
+  handle.textContent = "⋮⋮";
+  handle.setAttribute("aria-label", "Drag to reorder");
+  bindBlockDrag(handle, groupIndex);
+  return handle;
+}
+
+let dragState = null;
+
+function clearDropHints() {
+  document.querySelectorAll("[data-block-index]").forEach((el) => {
+    el.classList.remove("drop-before", "drop-after", "is-dragging");
+  });
+}
+
+function endBlockDrag() {
+  if (!dragState) return;
+  const { handle, pointerId, from, over, place, moved } = dragState;
+  try {
+    if (handle?.hasPointerCapture?.(pointerId)) handle.releasePointerCapture(pointerId);
+  } catch {
+    // Capture may already be released.
+  }
+  document.body.classList.remove("is-block-dragging");
+  clearDropHints();
+  dragState = null;
+  if (!moved || over == null) return;
+  applyBlockChange(dropWorkoutBlock(selectedExercises, from, over, place));
+}
+
+function bindBlockDrag(handle, groupIndex) {
+  handle.addEventListener("pointerdown", (event) => {
+    if (event.button != null && event.button !== 0) return;
+    event.preventDefault();
+    handle.setPointerCapture(event.pointerId);
+    dragState = {
+      from: groupIndex,
+      over: groupIndex,
+      place: "before",
+      startY: event.clientY,
+      moved: false,
+      pointerId: event.pointerId,
+      handle,
+    };
+  });
+  handle.addEventListener("pointermove", (event) => {
+    if (!dragState || event.pointerId !== dragState.pointerId) return;
+    if (!dragState.moved && Math.abs(event.clientY - dragState.startY) < 8) return;
+    dragState.moved = true;
+    document.body.classList.add("is-block-dragging");
+    const source = document.querySelector(`[data-block-index="${dragState.from}"]`);
+    source?.classList.add("is-dragging");
+    const under = document.elementFromPoint(event.clientX, event.clientY);
+    const block = under?.closest?.("[data-block-index]");
+    if (!block) return;
+    const over = Number(block.dataset.blockIndex);
+    const rect = block.getBoundingClientRect();
+    const place = dropPlaceFromOffset(event.clientY - rect.top, rect.height);
+    dragState.over = over;
+    dragState.place = place;
+    clearDropHints();
+    source?.classList.add("is-dragging");
+    if (over !== dragState.from) {
+      block.classList.add(place === "before" ? "drop-before" : "drop-after");
+    }
+  });
+  handle.addEventListener("pointerup", (event) => {
+    if (!dragState || event.pointerId !== dragState.pointerId) return;
+    endBlockDrag();
+  });
+  handle.addEventListener("pointercancel", (event) => {
+    if (!dragState || event.pointerId !== dragState.pointerId) return;
+    dragState.moved = false;
+    endBlockDrag();
+  });
+}
+
+function appendBlockToolbar(container, group, groupIndex, groupCount) {
+  const toolbar = document.createElement("div");
+  toolbar.className = "block-toolbar";
+  if (groupCount > 1) toolbar.appendChild(createDragHandle(groupIndex));
   const actions = document.createElement("div");
   actions.className = "builder-actions";
-  appendBlockMoveButtons(actions, groupIndex, groupCount, item.name);
-
-  const next = selectedExercises[index + 1];
-  const nextIsFree = next && !next.supersetId && !item.supersetId;
-  if (nextIsFree) {
+  const label =
+    group.kind === "superset"
+      ? `${group.exercises[0].name} + ${group.exercises[1].name}`
+      : group.exercises[0].name;
+  appendBlockMoveButtons(actions, groupIndex, groupCount, label);
+  if (group.kind === "superset") {
+    appendPairActions(actions, group);
+  } else if (canPairWithNext(selectedExercises, group.indices[0])) {
     actions.appendChild(
       tinyButton("Superset with next", {
-        onClick: () => {
-          selectedExercises = togglePairWithNext(selectedExercises, index);
-          renderExerciseList();
-        },
+        onClick: () => applyBlockChange(togglePairWithNext(selectedExercises, group.indices[0])),
       })
     );
   }
+  toolbar.appendChild(actions);
+  container.appendChild(toolbar);
+}
 
+function renderBuilderSingle(index, group, groupIndex, groupCount) {
+  const wrap = document.createElement("div");
+  wrap.className = "builder-exercise-row";
+  wrap.appendChild(builderNameEl(index));
+  appendBlockToolbar(wrap, group, groupIndex, groupCount);
+
+  const actions = wrap.querySelector(".builder-actions");
   const removeBtn = document.createElement("button");
   removeBtn.type = "button";
   removeBtn.className = "btn btn-danger";
   removeBtn.textContent = "Remove";
   removeBtn.addEventListener("click", () => removeExercise(index));
   actions.appendChild(removeBtn);
-
-  row.appendChild(actions);
-  return row;
+  return wrap;
 }
 
 function renderBuilderPair(group, groupIndex, groupCount) {
   const wrap = document.createElement("div");
   wrap.className = "builder-superset";
-
   const header = document.createElement("div");
   header.className = "builder-block-header";
   const badge = document.createElement("div");
   badge.className = "superset-badge";
   badge.textContent = "Superset";
-  const actions = document.createElement("div");
-  actions.className = "builder-actions";
-  const label = `${group.exercises[0].name} + ${group.exercises[1].name}`;
-  appendBlockMoveButtons(actions, groupIndex, groupCount, label);
-  actions.appendChild(
-    tinyButton("Swap order", {
-      ariaLabel: `Swap order of ${label}`,
-      onClick: () => {
-        selectedExercises = swapSupersetPartners(selectedExercises, group.indices[0]);
-        renderExerciseList();
-      },
-    })
-  );
-  actions.appendChild(
-    tinyButton("Unpair", {
-      active: true,
-      onClick: () => {
-        selectedExercises = togglePairWithNext(selectedExercises, group.indices[0]);
-        renderExerciseList();
-      },
-    })
-  );
   header.appendChild(badge);
-  header.appendChild(actions);
+  appendBlockToolbar(header, group, groupIndex, groupCount);
   wrap.appendChild(header);
 
   group.indices.forEach((index) => {
@@ -819,12 +913,13 @@ function renderExerciseList() {
   const groups = groupedWorkoutItems(selectedExercises);
   groups.forEach((group, groupIndex) => {
     const li = document.createElement("li");
+    li.dataset.blockIndex = String(groupIndex);
     if (group.kind === "superset") {
       li.className = "exercise-list-item is-superset";
       li.appendChild(renderBuilderPair(group, groupIndex, groups.length));
     } else {
       li.className = "exercise-list-item";
-      li.appendChild(renderBuilderSingle(group.indices[0], groupIndex, groups.length));
+      li.appendChild(renderBuilderSingle(group.indices[0], group, groupIndex, groups.length));
     }
     exerciseList.appendChild(li);
   });
@@ -1214,31 +1309,31 @@ function renderSetsForm() {
   `;
   setsContainer.appendChild(legend);
 
-  if (selectedExercises.some((ex) => ex.supersetId)) {
-    const note = document.createElement("p");
-    note.className = "legend rest-superset-note";
-    note.textContent = "In a superset, rest starts after both exercises finish that set.";
-    setsContainer.appendChild(note);
-  }
+  const note = document.createElement("p");
+  note.className = "legend rest-superset-note";
+  note.textContent = selectedExercises.some((ex) => ex.supersetId)
+    ? "Rest starts after both sides of a superset finish that set. Reorder with ↑↓ or the ⋮⋮ handle; a pair moves as one block."
+    : "Reorder with ↑↓ or the ⋮⋮ handle. Superset with next pairs two adjacent lifts.";
+  setsContainer.appendChild(note);
 
   const prs = personalRecords();
+  const groups = groupedWorkoutItems(selectedExercises);
 
-  groupedWorkoutItems(selectedExercises).forEach((group) => {
+  groups.forEach((group, groupIndex) => {
+    const wrap = document.createElement("div");
+    wrap.className = group.kind === "superset" ? "track-block track-superset" : "track-block";
+    wrap.dataset.blockIndex = String(groupIndex);
     if (group.kind === "superset") {
-      const wrap = document.createElement("div");
-      wrap.className = "track-superset";
       const label = document.createElement("div");
       label.className = "superset-badge";
       label.textContent = `Superset · ${group.exercises[0].name} + ${group.exercises[1].name}`;
       wrap.appendChild(label);
-      group.indices.forEach((index) => {
-        wrap.appendChild(renderExerciseBlock(selectedExercises[index], index, prs));
-      });
-      setsContainer.appendChild(wrap);
-    } else {
-      const index = group.indices[0];
-      setsContainer.appendChild(renderExerciseBlock(selectedExercises[index], index, prs));
     }
+    appendBlockToolbar(wrap, group, groupIndex, groups.length);
+    group.indices.forEach((index) => {
+      wrap.appendChild(renderExerciseBlock(selectedExercises[index], index, prs));
+    });
+    setsContainer.appendChild(wrap);
   });
 }
 

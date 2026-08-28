@@ -582,6 +582,42 @@ export function moveWorkoutBlock(exercises, groupIndex, delta) {
   return next.flatMap((item) => item.exercises.map((ex) => ({ ...ex })));
 }
 
+export function moveWorkoutBlockTo(exercises, fromGroupIndex, toGroupIndex) {
+  return moveWorkoutBlock(exercises, fromGroupIndex, toGroupIndex - fromGroupIndex);
+}
+
+/**
+ * Where a dragged block should land after dropping on another block.
+ * `place` is "before" or "after" the hovered group.
+ */
+export function dropTargetIndex(fromIndex, overIndex, place) {
+  const from = Number(fromIndex);
+  const over = Number(overIndex);
+  if (!Number.isInteger(from) || !Number.isInteger(over) || from === over) return from;
+  if (place === "before") return from < over ? over - 1 : over;
+  if (place === "after") return from < over ? over : over + 1;
+  return from;
+}
+
+export function dropPlaceFromOffset(offsetY, height) {
+  if (!height || offsetY < height / 2) return "before";
+  return "after";
+}
+
+export function dropWorkoutBlock(exercises, fromGroupIndex, overGroupIndex, place) {
+  const to = dropTargetIndex(fromGroupIndex, overGroupIndex, place);
+  if (to === fromGroupIndex) return cloneExercises(exercises);
+  return moveWorkoutBlockTo(exercises, fromGroupIndex, to);
+}
+
+export function canPairWithNext(exercises, index) {
+  const current = exercises?.[index];
+  const next = exercises?.[index + 1];
+  if (!current || !next) return false;
+  if (current.supersetId || next.supersetId) return false;
+  return true;
+}
+
 /** Swap the two lifts inside a pair. `index` can be either partner. */
 export function swapSupersetPartners(exercises, index) {
   const partner = findSupersetPartnerIndex(exercises, index);

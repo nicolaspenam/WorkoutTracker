@@ -74,6 +74,10 @@ import {
   moveExercise,
   moveWorkoutBlock,
   swapSupersetPartners,
+  dropWorkoutBlock,
+  dropTargetIndex,
+  dropPlaceFromOffset,
+  canPairWithNext,
   normalizeSupersetAdjacency,
   shouldStartRestTimer,
   restNotificationPayload,
@@ -1133,6 +1137,58 @@ describe("supersets and rest-timer gating", () => {
     );
     assert.equal(list[0].supersetId, "ss-1");
     assert.equal(list[1].supersetId, "ss-1");
+  });
+
+  test("dropTargetIndex inserts before or after without splitting blocks", () => {
+    assert.equal(dropTargetIndex(0, 2, "after"), 2);
+    assert.equal(dropTargetIndex(0, 2, "before"), 1);
+    assert.equal(dropTargetIndex(2, 0, "before"), 0);
+    assert.equal(dropTargetIndex(2, 0, "after"), 1);
+    assert.equal(dropTargetIndex(1, 1, "after"), 1);
+  });
+
+  test("dropPlaceFromOffset uses the hovered half of a block", () => {
+    assert.equal(dropPlaceFromOffset(10, 100), "before");
+    assert.equal(dropPlaceFromOffset(60, 100), "after");
+  });
+
+  test("dropWorkoutBlock can drag a pair past a standalone as one unit", () => {
+    const list = dropWorkoutBlock(
+      [
+        createExercise("Squat", 3, null, { supersetId: "ss-1" }),
+        createExercise("Bench Press", 3, null, { supersetId: "ss-1" }),
+        createExercise("Row"),
+      ],
+      0,
+      1,
+      "after"
+    );
+    assert.deepEqual(
+      list.map((ex) => ex.name),
+      ["Row", "Squat", "Bench Press"]
+    );
+    assert.equal(list[1].supersetId, list[2].supersetId);
+  });
+
+  test("reordering and pairing keep logged set values", () => {
+    const squat = createExercise("Squat", 2, null, { supersetId: "ss-1" });
+    squat.sets[0].weight = "225";
+    squat.sets[0].reps = "5";
+    squat.sets[0].completed = true;
+    const bench = createExercise("Bench Press", 2, null, { supersetId: "ss-1" });
+    bench.sets[0].weight = "135";
+    const row = createExercise("Row");
+    row.sets[0].weight = "155";
+    const moved = moveWorkoutBlock([squat, bench, row], 0, 1);
+    assert.equal(moved[1].name, "Squat");
+    assert.equal(moved[1].sets[0].weight, "225");
+    assert.equal(moved[1].sets[0].completed, true);
+    assert.equal(moved[0].sets[0].weight, "155");
+    const unpaired = togglePairWithNext(moved, 1);
+    assert.equal(unpaired[1].sets[0].weight, "225");
+    assert.equal(unpaired[1].supersetId, null);
+    assert.equal(canPairWithNext(unpaired, 1), true);
+    assert.equal(canPairWithNext(moved, 1), false);
   });
 
   test("normalizeSupersetAdjacency drops orphan ids", () => {

@@ -48,7 +48,7 @@ Then open the URL in your phone or browser. In Chrome on Android, use **Install 
 1. Optionally name the workout, then add exercises — pick equipment and/or a muscle chip first to narrow the list, use a suggestion, or open **History** and tap **Use workout**. Pair adjacent lifts with **Superset with next**
 2. Allow rest notifications if prompted, then tap **Start Workout**
 3. Enter weight and reps, or tap **✓** to fill last time’s numbers for that set
-4. Use **+** / **−** to add or remove sets; rest defaults to 1:30 and can be changed or nudged ±15s. In a superset, rest starts after both sides finish that set
+4. Use **+** / **−** to add or remove sets; rest defaults to 1:30 and can be changed or nudged ±15s. In a superset, rest starts after both sides finish that set. You can still reorder, pair, or unpair during the session (↑↓ or the drag handle; a pair moves as one block)
 5. **Finish Workout** saves the session (including order and supersets) and updates PRs
 6. Search an exercise on the **PRs** tab (or filter by muscle) to see your best set
 7. On **History**, **Remove** hides a workout from the list only. Use **Export backup** to download a JSON file (save it to Drive/iCloud). **Import backup** restores it — merge keeps existing sessions, replace overwrites this device
