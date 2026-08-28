@@ -633,6 +633,75 @@ body {
   margin-top: 0.15rem;
 }
 
+.exercise-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex-shrink: 0;
+}
+
+.btn-swap {
+  min-height: 2.1rem;
+  padding: 0.25rem 0.7rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+#track-add-exercise-btn {
+  margin-bottom: 0.75rem;
+}
+
+.modal {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(0, 0, 0, 0.55);
+}
+
+.modal.hidden {
+  display: none;
+}
+
+.modal-card {
+  width: min(100%, 560px);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 1rem;
+  box-shadow: var(--shadow);
+  margin-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+.modal-card .select {
+  width: 100%;
+  margin: 0.65rem 0 0.85rem;
+}
+
+.modal-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+}
+
+.update-routine-prompt {
+  margin-top: 1rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid var(--border);
+}
+
+.update-routine-prompt.hidden {
+  display: none;
+}
+
 .set-controls {
   display: flex;
   align-items: center;
@@ -917,6 +986,11 @@ body {
 
   .exercise-header {
     flex-wrap: wrap;
+  }
+
+  .exercise-header-actions {
+    width: 100%;
+    justify-content: space-between;
   }
 
   .import-confirm .backup-actions {
