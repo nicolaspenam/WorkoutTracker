@@ -5,7 +5,7 @@ A simple, mobile-friendly workout tracker built with vanilla HTML, CSS, and Java
 ## Features
 
 - Build a workout from a dropdown, or reuse a previous session from **History**
-- Filter the (expanded) exercise list by main muscle: chest, back, shoulders, arms, legs, glutes, calves, core
+- Filter the (expanded) exercise list by main muscle chips that wrap onto extra rows: chest, back, shoulders, arms, legs, glutes, calves, core
 - Optional name for each workout (e.g. “Push Day”)
 - Log weight and reps per set, with add/remove set controls
 - See last time’s weight/reps for each set and tap **✓** to copy them
